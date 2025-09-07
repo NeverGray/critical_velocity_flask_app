@@ -1,0 +1,21 @@
+# .gitignore for Python/Flask
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+.env
+.venv/
+venv/
+ENV/
+env/
+.idea/
+.vscode/
+.DS_Store
+*.log
+instance/
+*.egg-info/
+dist/
+build/
+*.bak

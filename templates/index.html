@@ -1,0 +1,225 @@
+<!--
+Project Name: Beyer-Stacey-Brenn CV Calculator
+Description: A web application to calculate the critical velocity based on Beyer-Stacey-Brenn
+Copyright (c) 2025 Justin Edenbaum, Never Gray
+Licensed under the MIT License. https://opensource.org/licenses/MIT
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Critical Velocity Calculator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mt-5">Critical Velocity Calculator</h1>
+            <div class="mt-4 mb-4" style="text-align: left;">
+            <strong>Key Formulas:</strong>
+            <div>
+                $$
+                K_F = f_g \cdot a_w \left[ 1 - \min\left(1, \frac{W_{fire} L_n}{A}\right) \right] + 1 - f_g
+                $$
+            </div>
+            <div>
+                <!-- Critical Velocity Formula -->
+                $$
+                U_c = K_F K_g \left( \frac{g L_n^3}{D_h^2} \frac{\Delta T_p}{T_a + \Delta T_p} \right)^{1/2}
+                $$
+            </div>
+            <div>
+            <!-- Delta T_p Formula -->
+            $$
+                \Delta T_p = \frac{
+                    \min\left(\dot{Q}, I_{fire} W_{fire} L_n f_h K_L\right)(1 - \epsilon)(1 - \eta)
+                }{
+                    \min\left(A, L_n (W_{fire} + m L_n)\right) U_c \rho_a c_p
+                }
+                $$
+        </div>
+        </div>
+        <form method="POST" action="/" class="mt-4">
+            <table class="table table-bordered w-auto">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Description</th>
+                        <th>Unit</th>
+                        <th>Use Default</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Fire Properties Sub-heading -->
+                    <tr class="table-secondary">
+                        <td colspan="5"><strong>Fire Properties</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( \dot{Q} \)</strong></td>
+                        <td>Total fire heat release rate</td>
+                        <td>MW</td>
+                        <td></td>
+                        <td><input type="text" class="form-control" id="hrr" name="hrr" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.hrr|default('') }}"></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( I_{fire} \)</strong></td>
+                        <td>Fire intensity (heat release rate per unit area) <br><small>e.g. pool fire with oil fuel 2.25 MW/m²</small></td>
+                        <td>MW/m²</td>
+                        <td class="text-center">
+                            <input type="checkbox" name="use_default_intensity" id="use_default_intensity"
+                                {% if form_values.use_default_intensity %}checked{% endif %}
+                                onchange="toggleDefault('intensity', {{ DEFAULTS.intensity }})">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" id="intensity" name="intensity"
+                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
+                                value="{{ form_values.intensity|default(DEFAULTS.intensity) }}"
+                                {% if form_values.use_default_intensity %}readonly{% endif %}>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( W_{fire} \)</strong></td>
+                        <td>Maximum width of the fire source <br><small>e.g. fire pans of Memorial Tunnel tests were 3.66 m wide</small></td>
+                        <td>m</td>
+                        <td class="text-center">
+                            <input type="checkbox" name="use_default_width" id="use_default_width"
+                                {% if form_values.use_default_width %}checked{% endif %}
+                                onchange="toggleDefault('width', {{ DEFAULTS.width }})">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" id="width" name="width"
+                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
+                                value="{{ form_values.width|default(DEFAULTS.width) }}"
+                                {% if form_values.use_default_width %}readonly{% endif %}>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( \epsilon \)</strong></td>
+                        <td>Heat reduction due to imperfect combustion and thermal radiation</td>
+                        <td>-</td>
+                        <td class="text-center">
+                            <input type="checkbox" name="use_default_epsilon" id="use_default_epsilon"
+                                {% if form_values.use_default_epsilon %}checked{% endif %}
+                                onchange="toggleDefault('epsilon', {{ DEFAULTS.epsilon }})">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" id="epsilon" name="epsilon"
+                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
+                                value="{{ form_values.epsilon|default(DEFAULTS.epsilon) }}"
+                                {% if form_values.use_default_epsilon %}readonly{% endif %}>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( \eta \)</strong></td>
+                        <td>Reduction of the convective heat release rate due to water mist systems or sprinklers </td>
+                        <td>-</td>
+                        <td class="text-center">
+                            <input type="checkbox" name="use_default_eta" id="use_default_eta"
+                                {% if form_values.use_default_eta %}checked{% endif %}
+                                onchange="toggleDefault('eta', {{ DEFAULTS.eta }})">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" id="eta" name="eta"
+                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
+                                value="{{ form_values.eta|default(DEFAULTS.eta) }}"
+                                {% if form_values.use_default_eta %}readonly{% endif %}>
+                        </td>
+                    </tr>
+                    <!-- Tunnel Properties Sub-heading -->
+                    <tr class="table-secondary">
+                        <td colspan="5"><strong>Tunnel Properties</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( L_n \)</strong></td>
+                        <td>Characteristic length (height) for natural convection (for pool fires: tunnel height from the base of the fire to highest point at the ceiling) </td>
+                        <td>m</td>
+                        <td></td>
+                        <td><input type="text" class="form-control" id="height" name="height" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.height|default('') }}"></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( A \)</strong></td>
+                        <td>Tunnel cross-sectional area at the fire site</td>
+                        <td>m²</td>
+                        <td></td>
+                        <td><input type="text" class="form-control" id="area" name="area" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.area|default('') }}"></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( D_h \)</strong></td>
+                        <td>Tunnel hydraulic diameter at the fire location</td>
+                        <td>m</td>
+                        <td></td>
+                        <td><input type="text" class="form-control" id="hydraulic_diameter" name="hydraulic_diameter" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.hydraulic_diameter|default('') }}"></td>
+                    </tr>
+
+                    <!-- Ambient Properties Sub-heading -->
+                    <tr class="table-secondary">
+                        <td colspan="5"><strong>Ambient Properties</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( T_a \)</strong></td>
+                        <td>Temperature of upstream air</td>
+                        <td>K</td>
+                        <td class="text-center">
+                            <input type="checkbox" name="use_default_ambient_temp" id="use_default_ambient_temp"
+                                {% if form_values.use_default_ambient_temp %}checked{% endif %}
+                                onchange="toggleDefault('ambient_temp', {{ DEFAULTS.ambient_temp }})">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" id="ambient_temp" name="ambient_temp"
+                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
+                                value="{{ form_values.ambient_temp|default(DEFAULTS.ambient_temp) }}"
+                                {% if form_values.use_default_ambient_temp %}readonly{% endif %}>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( \rho_a \)</strong></td>
+                        <td>Ambient Density</td>
+                        <td>kg/m³</td>
+                        <td class="text-center">
+                            <input type="checkbox" name="use_default_ambient_density" id="use_default_ambient_density"
+                                {% if form_values.use_default_ambient_density %}checked{% endif %}
+                                onchange="toggleDefault('ambient_density', {{ DEFAULTS.ambient_density }})">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" id="ambient_density" name="ambient_density"
+                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
+                                value="{{ form_values.ambient_density|default(DEFAULTS.ambient_density) }}"
+                                {% if form_values.use_default_ambient_density %}readonly{% endif %}>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-primary">Calculate Critical Velocity</button>
+        </form>
+        {% if critical_velocity is not none %}
+            <h2 class="mt-5">Results</h2>
+            <p>Critical Velocity: {{ critical_velocity }} m/s</p>
+            <p>Delta T: {{ delta_t }} K</p>
+        {% endif %}
+        {% if plot_url %}
+    <h3 class="mt-5">Critical Velocity Plot</h3>
+    <img src="data:image/png;base64,{{ plot_url }}" class="img-fluid" alt="Critical Velocity Plot">
+{% endif %}
+    </div>
+
+<script>
+    // Simple JS to toggle readonly and set default value when checkbox is checked
+    function toggleDefault(field, defaultValue) {
+        var checkbox = document.getElementById('use_default_' + field);
+        var input = document.getElementById(field);
+        if (checkbox.checked) {
+            input.value = defaultValue;
+            input.readOnly = true;
+        } else {
+            input.readOnly = false;
+        }
+    }
+</script>
+
+</body>
+</html>
+
