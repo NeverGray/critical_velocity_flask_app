@@ -59,10 +59,10 @@ def index():
 
             # Save for repopulation
             form_values = {
-                'hrr': hrr,
                 'height': height,
                 'area': area,
                 'hydraulic_diameter': hydraulic_diameter,
+                'hrr': hrr,
                 'intensity': intensity,
                 'width': width,
                 'epsilon': epsilon,
@@ -78,16 +78,16 @@ def index():
             }
 
             # Convert to float for calculation
+            #Tunnel Properties
+            height = float(height)
+            area = float(area)
+            hydraulic_diameter = float(hydraulic_diameter)
             #Fire Properties
             hrr = float(hrr)*1e6 # Convert MW to W
             intensity = float(intensity)*1e6 # Convert MW/m² to W/m²
             width = float(width)
             epsilon = float(epsilon)
             eta = float(eta)
-            #Tunnel Properties
-            height = float(height)
-            area = float(area)
-            hydraulic_diameter = float(hydraulic_diameter)
             #Ambient Properties
             ambient_temp = float(ambient_temp)
             ambient_density = float(ambient_density)

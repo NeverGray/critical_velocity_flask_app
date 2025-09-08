@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import matplotlib.lines as mlines
 
 # Constants and empirical parameters
 g = 9.81 #Gravitaional acceleration (m/s^2)
@@ -68,23 +69,7 @@ def air_specific_heat(T1, T2):
         return cp_air_high((T1+T2)/2)
     else:
         print("WARNING!  Temperature is too high.  Temperature is clipped to 3000 K")
-        return cp_air_high(3000.0)
-        
-
-"""This thermodynamicly more appropriate function for calculating the specific heat capacity is not used.  
-    Using this function would require adjustment of the empirical parameters as these parameters were derived 
-    based on fitting the equation to real data using the more simplistic correlation above"""
-#def air_specific_heat(T1, T2):
-#    """Function to determine the specific heat capacity of air between two 
-#    temperatures"""
-#    if (T1 <= 1000 and T2 <= 1000):
-#        return (cp_air_low(T2)*(T2-273.15) - cp_air_low(T1)*(T1-273.15))/(T2-T1)
-#    elif (T2 > 1000 and T2 <= 3000 and T1<=1000):
-#        return (cp_air_high(T2)*(T2-273.15) - cp_air_low(T1)*(T1-273.15))/(T2-T1)
-#    else:
-#        print("WARNING!  Temperature is too high.  Temperature is clipped to 3000 K")
-#       return (cp_air_high(3000.0)*(3000.0-273.15) - cp_air_low(T1)*(T1-273.15))/(3000-T1)
-        
+        return cp_air_high(3000.0)       
 
 def calculate_delta_t(fire: Fire, tunnel: Tunnel, critical_velocity, ambient_density, specific_heat):
     """Function to calculate delta T_p (relevant for buoyancy force) based on initial/previous critical velocity value.
@@ -99,14 +84,6 @@ def calculate_delta_t(fire: Fire, tunnel: Tunnel, critical_velocity, ambient_den
            / (min(tunnel.area, tunnel.height * (fire.width + m * tunnel.height)) \
            * critical_velocity * ambient_density * specific_heat)
 
-
-def calculate_delta_t_simple(fire, tunnel, critical_velocity):
-    """Simplified function to calculate delta T_p (relevant for buoyancy force) based on initial/previous critical velocity value.
-    Based on Equation (38)
-    """
-    return (2.92e-4 * critical_velocity * (7.14 + tunnel.height)*(0.95 + np.exp(-8.0e-8 * fire.hrr / tunnel.height))) ** -1
-
-
 def calculate_critical_velocity(fire, tunnel, delta_T, ambient_T):
     """Function to calculate critical velocity. 
     Based on equation (30) and (35)
@@ -114,15 +91,6 @@ def calculate_critical_velocity(fire, tunnel, delta_T, ambient_T):
     K_F = f_g * a_w * (1.0 - min(1.0, (fire.width * tunnel.height)/tunnel.area)) + 1.0 - f_g
 
     return K_F * np.sqrt((g * tunnel.height ** 3.0 / tunnel.hydraulic_diameter ** 2.0) * delta_T / (ambient_T + delta_T) )
-
-
-def calculate_critical_velocity_simple(fire, tunnel, delta_t):
-    """Simplified function to calculate critical velocity.
-    Based on equation (37)
-    """
-    return (1.476 - 2.64 * tunnel.height / tunnel.area) \
-         * ((g * tunnel.height ** 3.0 / tunnel.hydraulic_diameter ** 2.0) * delta_t / (294.0 + delta_t)) ** 0.5
-
 
 def iterate_critical_velocity(fire, tunnel, critical_velocity, ambient_T, ambient_density, epsilon, eta, K_g, tol):
     """Iterative critical velocity calculation.
@@ -140,20 +108,6 @@ def iterate_critical_velocity(fire, tunnel, critical_velocity, ambient_T, ambien
         if abs(critical_velocity - old_critical_velocity) < tol:
             return critical_velocity*K_g, dt #Grade factor applied after the iteration according to Equation (28)
 
-
-def iterate_critical_velocity_simple(fire, tunnel, critical_velocity, tol):
-    """Iterative critical velocity solver based on simplified equations.
-    Based on suggested parameters (see at the end of the script) and constant specific heat capacity of 1007 J/(kg K)
-    """
-    relaxation = 0.7 #Relaxation factor to reduce number of iterations
-    while True:
-        old_critical_velocity = critical_velocity
-        dt = calculate_delta_t_simple(fire, tunnel, critical_velocity)
-        critical_velocity = relaxation*calculate_critical_velocity_simple(fire, tunnel, dt)+ (1.0-relaxation)*old_critical_velocity
-        if abs(critical_velocity - old_critical_velocity) < tol:
-            return critical_velocity, dt
-
-
 def oxygen_depletion(fire_hrr, tunnel, ambient_density):
     """Correlation for minimum required oxygen demand (minimum upstream air velocity) based on tunnel parameters and HRR
     """
@@ -167,9 +121,9 @@ def oxygen_depletion(fire_hrr, tunnel, ambient_density):
 def plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambient_density, fire_intensity, fire_width, epsilon, eta, K_g, tol, for_web=True):
     """Function to create a plot of critical velocity against HRR and return the figure and axis
     """
-    fire_hrrs = np.linspace(min_hrr, max_hrr, 1491)
+    fire_hrrs = np.linspace(min_hrr, max_hrr, 1991)
     critical_velocity = np.empty_like(fire_hrrs)
-    critical_velocity[-1] = 1.0
+    critical_velocity[-1] = 1.0 #First Guess
     delta_t = np.empty_like(fire_hrrs)
     marker=0
     for i, fire_hrr in enumerate(fire_hrrs):
@@ -188,45 +142,30 @@ def plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambi
             critical_velocity[i] = vel_depletion
             fire_hrrs[i] = hrr_depletion
             
-    ax.plot(fire_hrrs*1e-6, critical_velocity*K_g, label=tunnel.name)
+    line, = ax.plot(fire_hrrs*1e-6, critical_velocity*K_g, label='')
     
-# Save CSV file with HRR (MW) and critical velocity (m/s) for each listed tunnel
+    # Add parameter values to the legend
+    param_lines = [
+        mlines.Line2D([], [], color='none', label=f"{'Fire intensity:':<16} {fire_intensity/1e6:>7.2f} MW/m²"),
+        mlines.Line2D([], [], color='none', label=f"{'Fire width:':<16} {fire_width:>7.2f} m"),
+        mlines.Line2D([], [], color='none', label=f"{'Heat reduction:':<16} {epsilon:>7.2f}"),
+        mlines.Line2D([], [], color='none', label=f"{'Tunnel Area:':<16} {tunnel.area:>7.2f} m²"),
+        mlines.Line2D([], [], color='none', label=f"{'Tunnel Height:':<16} {tunnel.height:>7.2f} m"),
+        mlines.Line2D([], [], color='none', label=f"{'Hydraulic Diam.:':<16} {tunnel.hydraulic_diameter:>7.2f} m"),
+        mlines.Line2D([], [], color='none', label=""),
+        mlines.Line2D([], [], color='none', label="Never Gray CV Calculator"),
+    ]
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(
+        handles + param_lines,
+        labels + [l.get_label() for l in param_lines],
+        loc='lower right',
+        prop={'family': 'monospace', 'size': 9}
+    )
+
     if not for_web:
         DF = pd.DataFrame(critical_velocity, fire_hrrs*1.0e-6)
         DF.to_csv(f"{tunnel.name} .csv")
-    return fig, ax
-
-
-
-def plot_critical_velocity_simple(fig, ax, tunnel, min_hrr, max_hrr, tol, to_csv=False):
-    """Function to create a plot of critical velocity  against HRR based on simplified equations and return the figure and axis
-    """
-    fire_hrrs = np.linspace(min_hrr, max_hrr, 1491)
-    critical_velocity = np.empty_like(fire_hrrs)
-    critical_velocity[-1] = 1
-    delta_t = np.empty_like(fire_hrrs)
-    marker=0
-    for i, fire_hrr in enumerate(fire_hrrs):
-        fire = Fire(fire_hrr, 2.25e6, 2.5, 0.2, 0.0)
-        critical_velocity[i], delta_t[i] = iterate_critical_velocity_simple(fire, tunnel, critical_velocity[i-1], tol)
-        
-        #HRR cut off if minimum oxygen requirement not met
-        if (critical_velocity[i] <= oxygen_depletion(fire_hrr, tunnel, 1.2) and marker == 0):
-            vel_depletion = oxygen_depletion(fire_hrr, tunnel, 1.2)
-            critical_velocity[i] = vel_depletion
-            hrr_depletion =  fire_hrr
-            fire_hrrs[i] = hrr_depletion
-            marker =1
-            print("!!!!HRR cut off due to oxygen depletion (simplified)!!!!")
-        elif marker != 0:
-            critical_velocity[i] = vel_depletion
-            fire_hrrs[i] = hrr_depletion
-            
-    ax.plot(fire_hrrs*1.0e-6, critical_velocity, label=f"{tunnel.name} simplified", linestyle="--")
-     
-    # Save CSV file with HRR (MW) and critical velocity (m/s) based on smplified equations for each listed tunnel 
-    DF = pd.DataFrame(critical_velocity, fire_hrrs*1.0e-6)
-    DF.to_csv(f"{tunnel.name} simplified.csv")
     return fig, ax
 
 def fire_response(tunnels, min_hrr, max_hrr, tol, ambient_temp, ref_pressure, fire_intensity, fire_width, epsilon, eta, K_g, for_web=False):
@@ -234,15 +173,10 @@ def fire_response(tunnels, min_hrr, max_hrr, tol, ambient_temp, ref_pressure, fi
     """
 
     ambient_density = ref_pressure/(287.0 * ambient_temp)  #Ambient density calculation based on reference pressure (kg/m^3)
-    
-
     fig, ax = plt.subplots()
 
     for tunnel in tunnels:
         fig, ax = plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambient_density, fire_intensity, fire_width, epsilon, eta, K_g, tol)
-        if not for_web:
-            if (tunnel.height < 9.0 and tunnel.area > tunnel.height*(2.5+0.35*tunnel.height)):
-                fig, ax = plot_critical_velocity_simple(fig, ax, tunnel, min_hrr if min_hrr>10.0e6 else 10.0e6, max_hrr, tol)
 
     ax.set(title="Critical Velocity",
            xlabel="Total Fire Heat Release Rate (MW)",
@@ -253,7 +187,7 @@ def fire_response(tunnels, min_hrr, max_hrr, tol, ambient_temp, ref_pressure, fi
            ylim=[0.0, 4.0])
     ax.grid(True)
 
-    ax.legend()
+    #ax.legend()
     fig.tight_layout()
     fig.set_size_inches(8.0, 4.5)
     if not for_web:
