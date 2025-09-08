@@ -143,27 +143,26 @@ def plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambi
             fire_hrrs[i] = hrr_depletion
             
     line, = ax.plot(fire_hrrs*1e-6, critical_velocity*K_g, label='')
-    
+    if for_web:
     # Add parameter values to the legend
-    param_lines = [
-        mlines.Line2D([], [], color='none', label=f"{'Fire intensity:':<16} {fire_intensity/1e6:>7.2f} MW/m²"),
-        mlines.Line2D([], [], color='none', label=f"{'Fire width:':<16} {fire_width:>7.2f} m"),
-        mlines.Line2D([], [], color='none', label=f"{'Heat reduction:':<16} {epsilon:>7.2f}"),
-        mlines.Line2D([], [], color='none', label=f"{'Tunnel Area:':<16} {tunnel.area:>7.2f} m²"),
-        mlines.Line2D([], [], color='none', label=f"{'Tunnel Height:':<16} {tunnel.height:>7.2f} m"),
-        mlines.Line2D([], [], color='none', label=f"{'Hydraulic Diam.:':<16} {tunnel.hydraulic_diameter:>7.2f} m"),
-        mlines.Line2D([], [], color='none', label=""),
-        mlines.Line2D([], [], color='none', label="Never Gray CV Calculator"),
-    ]
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(
-        handles + param_lines,
-        labels + [l.get_label() for l in param_lines],
-        loc='lower right',
-        prop={'family': 'monospace', 'size': 9}
-    )
-
-    if not for_web:
+        param_lines = [
+            mlines.Line2D([], [], color='none', label=f"{'Fire intensity:':<16} {fire_intensity/1e6:>7.2f} MW/m²"),
+            mlines.Line2D([], [], color='none', label=f"{'Fire width:':<16} {fire_width:>7.2f} m"),
+            mlines.Line2D([], [], color='none', label=f"{'Heat reduction:':<16} {epsilon:>7.2f}"),
+            mlines.Line2D([], [], color='none', label=f"{'Tunnel Area:':<16} {tunnel.area:>7.2f} m²"),
+            mlines.Line2D([], [], color='none', label=f"{'Tunnel Height:':<16} {tunnel.height:>7.2f} m"),
+            mlines.Line2D([], [], color='none', label=f"{'Hydraulic Diam.:':<16} {tunnel.hydraulic_diameter:>7.2f} m"),
+            mlines.Line2D([], [], color='none', label=""),
+            mlines.Line2D([], [], color='none', label="Never Gray CV Calculator"),
+        ]
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(
+            handles + param_lines,
+            labels + [l.get_label() for l in param_lines],
+            loc='lower right',
+            prop={'family': 'monospace', 'size': 9}
+        )
+    else: #Save CSV Files
         DF = pd.DataFrame(critical_velocity, fire_hrrs*1.0e-6)
         DF.to_csv(f"{tunnel.name} .csv")
     return fig, ax
