@@ -21,11 +21,6 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
             <div class="mt-4 mb-4" style="text-align: left;">
             <strong>Key Formulas:</strong>
             <div>
-                $$
-                K_F = f_g \cdot a_w \left[ 1 - \min\left(1, \frac{W_{fire} L_n}{A}\right) \right] + 1 - f_g
-                $$
-            </div>
-            <div>
                 <!-- Critical Velocity Formula -->
                 $$
                 U_c = K_F K_g \left( \frac{g L_n^3}{D_h^2} \frac{\Delta T_p}{T_a + \Delta T_p} \right)^{1/2}
@@ -33,14 +28,51 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
             </div>
             <div>
             <!-- Delta T_p Formula -->
-            $$
+                $$
                 \Delta T_p = \frac{
                     \min\left(\dot{Q}, I_{fire} W_{fire} L_n f_h K_L\right)(1 - \epsilon)(1 - \eta)
                 }{
                     \min\left(A, L_n (W_{fire} + m L_n)\right) U_c \rho_a c_p
                 }
                 $$
+                <div>
+                $$
+                K_F = f_g \cdot a_w \left[ 1 - \min\left(1, \frac{W_{fire} L_n}{A}\right) \right] + 1 - f_g
+                $$
+            </div>
+            <div>
+                $$
+                K_L = \frac{f_a + f_o}{f_a + e^{\frac{L_{fire}}{\gamma_L L_n}}}
+                $$
+            </div>
         </div>
+            <div class="mb-4" style="max-width: 600px;">
+        <strong>Empirical Factors and Constants:</strong>
+        <table class="table table-sm table-bordered text-center mt-2">
+            <thead class="thead-light">
+                <tr>
+                    <th><em>f<sub>h</sub></em></th>
+                    <th><em>f<sub>a</sub></em></th>
+                    <th><em>f<sub>o</sub></em></th>
+                    <th><em>&gamma;<sub>L</sub></em></th>
+                    <th><em>f<sub>g</sub></em></th>
+                    <th><em>a<sub>w</sub></em></th>
+                    <th><em>m</em></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0.176</td>
+                    <td>0.95</td>
+                    <td>0.88</td>
+                    <td>2.20</td>
+                    <td>0.58</td>
+                    <td>1.82</td>
+                    <td>0.35</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
         </div>
         <form method="POST" action="/" class="mt-4">
             <table class="table table-bordered w-auto">
@@ -54,6 +86,31 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                     </tr>
                 </thead>
                 <tbody>
+                    <!-- Tunnel Properties Sub-heading -->
+                    <tr class="table-secondary">
+                        <td colspan="5"><strong>Tunnel Properties</strong></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( L_n \)</strong></td>
+                        <td>Characteristic length (height) for natural convection (for pool fires: tunnel height from the base of the fire to highest point at the ceiling) </td>
+                        <td>m</td>
+                        <td></td>
+                        <td><input type="number" class="form-control" id="height" name="height" step="any" required value="{{ form_values.height|default('') }}"></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( A \)</strong></td>
+                        <td>Tunnel cross-sectional area at the fire site</td>
+                        <td>m²</td>
+                        <td></td>
+                        <td><input type="number" class="form-control" id="area" name="area" step="any" required value="{{ form_values.area|default('') }}"></td>
+                    </tr>
+                    <tr>
+                        <td><strong>\( D_h \)</strong></td>
+                        <td>Tunnel hydraulic diameter at the fire location</td>
+                        <td>m</td>
+                        <td></td>
+                        <td><input type="number" class="form-control" id="hydraulic_diameter" name="hydraulic_diameter" step="any" required value="{{ form_values.hydraulic_diameter|default('') }}"></td>
+                    </tr>
                     <!-- Fire Properties Sub-heading -->
                     <tr class="table-secondary">
                         <td colspan="5"><strong>Fire Properties</strong></td>
@@ -63,7 +120,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                         <td>Total fire heat release rate</td>
                         <td>MW</td>
                         <td></td>
-                        <td><input type="text" class="form-control" id="hrr" name="hrr" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.hrr|default('') }}"></td>
+                        <td><input type="number" class="form-control" id="hrr" name="hrr" step="any" required value="{{ form_values.hrr|default('') }}"></td>
                     </tr>
                     <tr>
                         <td><strong>\( I_{fire} \)</strong></td>
@@ -75,10 +132,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                 onchange="toggleDefault('intensity', {{ DEFAULTS.intensity }})">
                         </td>
                         <td>
-                            <input type="text" class="form-control" id="intensity" name="intensity"
-                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
-                                value="{{ form_values.intensity|default(DEFAULTS.intensity) }}"
-                                {% if form_values.use_default_intensity %}readonly{% endif %}>
+                            <input type="number" class="form-control" id="intensity" name="intensity" step="any" required value="{{ form_values.intensity|default(DEFAULTS.intensity) }}" {% if form_values.use_default_intensity %}readonly{% endif %}>
                         </td>
                     </tr>
                     <tr>
@@ -91,10 +145,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                 onchange="toggleDefault('width', {{ DEFAULTS.width }})">
                         </td>
                         <td>
-                            <input type="text" class="form-control" id="width" name="width"
-                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
-                                value="{{ form_values.width|default(DEFAULTS.width) }}"
-                                {% if form_values.use_default_width %}readonly{% endif %}>
+                            <input type="number" class="form-control" id="width" name="width" step="any" required value="{{ form_values.width|default(DEFAULTS.width) }}" {% if form_values.use_default_width %}readonly{% endif %}>
                         </td>
                     </tr>
                     <tr>
@@ -107,10 +158,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                 onchange="toggleDefault('epsilon', {{ DEFAULTS.epsilon }})">
                         </td>
                         <td>
-                            <input type="text" class="form-control" id="epsilon" name="epsilon"
-                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
-                                value="{{ form_values.epsilon|default(DEFAULTS.epsilon) }}"
-                                {% if form_values.use_default_epsilon %}readonly{% endif %}>
+                            <input type="number" class="form-control" id="epsilon" name="epsilon" step="any" required value="{{ form_values.epsilon|default(DEFAULTS.epsilon) }}" {% if form_values.use_default_epsilon %}readonly{% endif %}>
                         </td>
                     </tr>
                     <tr>
@@ -123,38 +171,10 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                 onchange="toggleDefault('eta', {{ DEFAULTS.eta }})">
                         </td>
                         <td>
-                            <input type="text" class="form-control" id="eta" name="eta"
-                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
-                                value="{{ form_values.eta|default(DEFAULTS.eta) }}"
-                                {% if form_values.use_default_eta %}readonly{% endif %}>
+                            <input type="number" class="form-control" id="eta" name="eta" step="any" required value="{{ form_values.eta|default(DEFAULTS.eta) }}" {% if form_values.use_default_eta %}readonly{% endif %}>
                         </td>
                     </tr>
-                    <!-- Tunnel Properties Sub-heading -->
-                    <tr class="table-secondary">
-                        <td colspan="5"><strong>Tunnel Properties</strong></td>
-                    </tr>
-                    <tr>
-                        <td><strong>\( L_n \)</strong></td>
-                        <td>Characteristic length (height) for natural convection (for pool fires: tunnel height from the base of the fire to highest point at the ceiling) </td>
-                        <td>m</td>
-                        <td></td>
-                        <td><input type="text" class="form-control" id="height" name="height" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.height|default('') }}"></td>
-                    </tr>
-                    <tr>
-                        <td><strong>\( A \)</strong></td>
-                        <td>Tunnel cross-sectional area at the fire site</td>
-                        <td>m²</td>
-                        <td></td>
-                        <td><input type="text" class="form-control" id="area" name="area" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.area|default('') }}"></td>
-                    </tr>
-                    <tr>
-                        <td><strong>\( D_h \)</strong></td>
-                        <td>Tunnel hydraulic diameter at the fire location</td>
-                        <td>m</td>
-                        <td></td>
-                        <td><input type="text" class="form-control" id="hydraulic_diameter" name="hydraulic_diameter" required pattern="^-?\d*\.?\d+$" inputmode="decimal" value="{{ form_values.hydraulic_diameter|default('') }}"></td>
-                    </tr>
-
+                    
                     <!-- Ambient Properties Sub-heading -->
                     <tr class="table-secondary">
                         <td colspan="5"><strong>Ambient Properties</strong></td>
@@ -169,10 +189,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                 onchange="toggleDefault('ambient_temp', {{ DEFAULTS.ambient_temp }})">
                         </td>
                         <td>
-                            <input type="text" class="form-control" id="ambient_temp" name="ambient_temp"
-                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
-                                value="{{ form_values.ambient_temp|default(DEFAULTS.ambient_temp) }}"
-                                {% if form_values.use_default_ambient_temp %}readonly{% endif %}>
+                            <input type="number" class="form-control" id="ambient_temp" name="ambient_temp" step="any" required value="{{ form_values.ambient_temp|default(DEFAULTS.ambient_temp) }}" {% if form_values.use_default_ambient_temp %}readonly{% endif %}>
                         </td>
                     </tr>
                     <tr>
@@ -185,20 +202,19 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                 onchange="toggleDefault('ambient_density', {{ DEFAULTS.ambient_density }})">
                         </td>
                         <td>
-                            <input type="text" class="form-control" id="ambient_density" name="ambient_density"
-                                required pattern="^-?\d*\.?\d+$" inputmode="decimal"
-                                value="{{ form_values.ambient_density|default(DEFAULTS.ambient_density) }}"
-                                {% if form_values.use_default_ambient_density %}readonly{% endif %}>
+                            <input type="number" class="form-control" id="ambient_density" name="ambient_density" step="any" required value="{{ form_values.ambient_density|default(DEFAULTS.ambient_density) }}" {% if form_values.use_default_ambient_density %}readonly{% endif %}>
                         </td>
                     </tr>
                 </tbody>
             </table>
             <button type="submit" class="btn btn-primary">Calculate Critical Velocity</button>
         </form>
-        {% if critical_velocity is not none %}
-            <h2 class="mt-5">Results</h2>
-            <p>Critical Velocity: {{ critical_velocity }} m/s</p>
-            <p>Delta T: {{ delta_t }} K</p>
+        {% if critical_velocity %}
+        <div class="alert alert-success mt-4">
+            <h4>Results</h4>
+            <p><strong>Total Fire Heat Release Rate:</strong> {{ form_values.hrr }} MW</p>
+            <p><strong>Critical Velocity:</strong> {{ critical_velocity }} m/s</p>
+        </div>
         {% endif %}
         {% if plot_url %}
     <h3 class="mt-5">Critical Velocity Plot</h3>
