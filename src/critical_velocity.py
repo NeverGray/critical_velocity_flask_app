@@ -137,7 +137,7 @@ def plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambi
             hrr_depletion =  fire_hrr
             fire_hrrs[i] = hrr_depletion
             marker =1
-            print("!!!!HRR cut off due to oxygen depletion!!!!")
+            #print("!!!!HRR cut off due to oxygen depletion!!!!")
         elif marker != 0:
             critical_velocity[i] = vel_depletion
             fire_hrrs[i] = hrr_depletion
