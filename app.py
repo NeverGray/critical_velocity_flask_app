@@ -10,6 +10,7 @@ import io
 import base64
 import matplotlib
 matplotlib.use('Agg')  # Use non-GUI backend
+import matplotlib.pyplot as plt
 
 from src.critical_velocity import Fire, Tunnel, iterate_critical_velocity, fire_response
 
@@ -126,6 +127,7 @@ def index():
                 fig.savefig(buf, format='png')
                 buf.seek(0)
                 plot_url = base64.b64encode(buf.getvalue()).decode('utf8')
+                plt.close(fig)
             except Exception as e:
                 plot_url = None
 

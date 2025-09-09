@@ -196,6 +196,7 @@ def fire_response(tunnels, min_hrr, max_hrr, tol, ambient_temp, ref_pressure, fi
     print(1+x-1)
     if for_web:
         return fig
+    plt.close(fig)
 
 def plot_values():
 # Input: Tunnel name, tunnel height (Ln or H) (m), tunnel area (m^2), hydraulic diameter (m)
