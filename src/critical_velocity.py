@@ -128,8 +128,9 @@ def plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambi
     marker=0
     for i, fire_hrr in enumerate(fire_hrrs):
         fire = Fire(fire_hrr, fire_intensity, fire_width, epsilon, eta)
-        critical_velocity[i], delta_t[i] = iterate_critical_velocity(fire, tunnel, critical_velocity[i-1], ambient_temp, ambient_density, epsilon, eta, K_g, tol)
-        
+        if marker == 0:
+            critical_velocity[i], delta_t[i] = iterate_critical_velocity(fire, tunnel, critical_velocity[i-1], ambient_temp, ambient_density, epsilon, eta, K_g, tol)
+
         #HRR cut off if minimum oxygen requirement not met
         if (critical_velocity[i] <= oxygen_depletion(fire_hrr, tunnel, ambient_density) and marker == 0):
             vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
