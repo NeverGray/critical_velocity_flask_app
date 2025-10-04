@@ -131,28 +131,30 @@ def oxygen_depletion(fire_hrr, tunnel, ambient_density):
     return vel_depletion
 
 def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_density, for_web=True):
-    """ Generate a table of fire heat release rate vs critical velocity"""
+    """Generate a plot of fire heat release rate vs critical velocity - optimized version"""
+    # Get data and calculate maximums in one step
     fire_hrrs, critical_velocities, sufficient_oxygen = hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, for_web=for_web)
     max_critical_velocity = max(critical_velocities)
     max_fire_hrr = max(fire_hrrs)
 
-    """ Check if there is sufficient oxygen for HRR inputted hr (fire.hrr) and maximum HRR on plot"""
+    # Determine oxygen status and critical velocity
     if sufficient_oxygen:
         oxygen_depletion_msg = "There is sufficient oxygen for the prescribed parameters in the figure below."
         critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)
-    elif not sufficient_oxygen:
-        # The HRR could be cut off due to oxygen depletion
+    else:
         if fire.hrr < max_fire_hrr:
-            oxygen_depletion_msg = "The is insufficient oxygen for fires greater than {:.1f} MW".format( max_fire_hrr *1e-6)
+            oxygen_depletion_msg = f"There is insufficient oxygen for fires greater than {max_fire_hrr *1e-6:.1f} MW"
             critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)   
         else:
-            oxygen_depletion_msg = "HRR cut off due to oxygen depletion at {:.1f} MW".format(fire_hrrs[np.where(critical_velocities == max_critical_velocity)][0]*1e-6)
+            oxygen_depletion_msg = f"HRR cut off due to oxygen depletion at {fire_hrrs[np.where(critical_velocities == max_critical_velocity)][0]*1e-6:.1f} MW"
             fire.hrr = max_fire_hrr 
             critical_velocity = max_critical_velocity
 
-    """ Plot the data"""
-    fig, ax = plt.subplots()
-    line, = ax.plot(fire_hrrs*1e-6, critical_velocities, label='')
+    # Create plot with streamlined formatting
+    fig, ax = plt.subplots(figsize=(8.0, 4.5))
+    ax.plot(fire_hrrs*1e-6, critical_velocities)
+    
+    # Create parameter legend (same as before but more compact)
     param_lines = [
         mlines.Line2D([], [], color='none', label=f"{'Fire intensity:':<16} {fire.intensity/1e6:>7.2f} MW/m²"),
         mlines.Line2D([], [], color='none', label=f"{'Fire width:':<16} {fire.width:>7.2f} m"),
@@ -163,45 +165,18 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_density, for_web=
         mlines.Line2D([], [], color='none', label=""),
         mlines.Line2D([], [], color='none', label="Never Gray CV Calculator"),
     ]
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(
-        handles + param_lines,
-        labels + [l.get_label() for l in param_lines],
-        loc='lower right',
-        prop={'family': 'monospace', 'size': 9}
-    )
-    x_max_mw = max_fire_hrr * 1e-6
-    x_top = min(round_up_nice(x_max_mw),150)
-    
-    # Use the overall maximum CV with headroom
-    ylim_max = 1.05 * max_critical_velocity if max_critical_velocity > 0 else 1.0  # 5% headroom
-    y_top = round_up_nice(ylim_max)
-    
-    # Matplotlib to pick major ticks using common steps
-    
-    if x_top == 150:
-        tick_interval = x_top / 15
-        ax.xaxis.set_major_locator(MultipleLocator(tick_interval))
-    else:
-        ax.xaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
-    ax.yaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))  
-    ax.xaxis.set_minor_locator(AutoMinorLocator())
-    ax.yaxis.set_minor_locator(AutoMinorLocator())
-    ax.set(title="Critical Velocity",
-        xlabel="Total Fire Heat Release Rate (MW)",
-        xlim=[0.0, x_top],
-        ylabel="Critical Velocity (m/s)",
-        ylim=[0.0, y_top])
-    ax.grid(True)
+    ax.legend(param_lines, [l.get_label() for l in param_lines], loc='lower right', 
+              prop={'family': 'monospace', 'size': 9})
+
+    # Apply common formatting
+    format_cv_plot_axes(ax, max_fire_hrr * 1e-6, max_critical_velocity, "Critical Velocity")
     fig.tight_layout()
-    fig.set_size_inches(8.0, 4.5)
 
     if for_web:
         return fig, fire.hrr, critical_velocity, oxygen_depletion_msg
     else:
-        #If not for web, save the data as a CSV file and png
-        DF = pd.DataFrame(critical_velocities, fire_hrrs*1.0e-6)
-        DF.to_csv(f"{tunnel.name} .csv")
+        # Save files efficiently
+        pd.DataFrame(critical_velocities, fire_hrrs*1.0e-6).to_csv(f"{tunnel.name} .csv")
         fig.savefig(f"{tunnel.name}_critical_velocity.png")
         plt.close(fig)
         return fire.hrr, critical_velocity, oxygen_depletion_msg
@@ -235,61 +210,46 @@ def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min
                 break
     return fire_hrrs, critical_velocities, sufficient_oxygen
 
-def plot_multiple_tunnels(tunnels, fire, ambient_temp, ambient_density, for_web=False):
-    """Function to create a plot comparing critical velocities for multiple tunnels"""
-    fig, ax = plt.subplots()
+def format_cv_plot_axes(ax, max_hrr_mw, max_cv, title):
+    """Common formatting for critical velocity plots"""
+    x_top = min(round_up_nice(max_hrr_mw), 150)
+    y_top = round_up_nice(1.05 * max_cv)
     
-    max_critical_velocity = 0
-    max_fire_hrr = 0
-    
-    # Plot each tunnel
-    for tunnel in tunnels:
-        fire_hrrs, critical_velocities, sufficient_oxygen = hrrs_vs_critical_velocities(
-            tunnel, fire, ambient_temp, ambient_density, for_web=True
-        )
-        
-        # Plot the line for this tunnel
-        ax.plot(fire_hrrs*1e-6, critical_velocities, label=tunnel.name, linewidth=2)
-        
-        # Track maximum values for plot scaling
-        max_critical_velocity = max(max_critical_velocity, max(critical_velocities))
-        max_fire_hrr = max(max_fire_hrr, max(fire_hrrs))
-    
-    # Format Plot
-    x_max_mw = max_fire_hrr * 1e-6
-    x_top = min(round_up_nice(x_max_mw), 150)
-    
-    # Use the overall maximum CV with headroom
-    ylim_max = 1.05 * max_critical_velocity if max_critical_velocity > 0 else 1.0
-    y_top = round_up_nice(ylim_max)
-    
-    # Set up ticks
-    if x_top == 150:
-        tick_interval = x_top / 15
-        ax.xaxis.set_major_locator(MultipleLocator(tick_interval))
-    else:
-        ax.xaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
     ax.yaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.yaxis.set_minor_locator(AutoMinorLocator())
     
-    ax.set(title="Critical Velocity Comparison",
-           xlabel="Total Fire Heat Release Rate (MW)",
-           xlim=[0.0, x_top],
-           ylabel="Critical Velocity (m/s)",
-           ylim=[0.0, y_top])
+    ax.set(title=title, xlabel="Total Fire Heat Release Rate (MW)",
+           xlim=[0.0, x_top], ylabel="Critical Velocity (m/s)", ylim=[0.0, y_top])
     ax.grid(True)
+    return ax
+
+def create_comparison_plot(tunnels, fire, ambient_temp, ambient_density):
+    """Create comparison plot by combining tunnel data - single call per tunnel"""
+    fig, ax = plt.subplots(figsize=(10.0, 6.0))
+    
+    max_hrr = 0
+    max_cv = 0
+    
+    # Single call per tunnel - get data, plot, and track maximums
+    for tunnel in tunnels:
+        fire_hrrs, critical_velocities, _ = hrrs_vs_critical_velocities(
+            tunnel, fire, ambient_temp, ambient_density, for_web=True)
+        ax.plot(fire_hrrs*1e-6, critical_velocities, label=tunnel.name, linewidth=2)
+        
+        # Track maximums during the same loop
+        max_hrr = max(max_hrr, max(fire_hrrs) * 1e-6)
+        max_cv = max(max_cv, max(critical_velocities))
+    
+    # Apply common formatting
+    format_cv_plot_axes(ax, max_hrr, max_cv, "Critical Velocity Comparison")
     ax.legend(loc='best')
-    
     fig.tight_layout()
-    fig.set_size_inches(10.0, 6.0)
     
-    if for_web:
-        return fig
-    else:
-        fig.savefig("All_Tunnels_critical_velocity_comparison.png", dpi=300)
-        plt.close(fig)
-        return "All_Tunnels_critical_velocity_comparison.png"
+    fig.savefig("All_Tunnels_critical_velocity_comparison.png", dpi=300)
+    plt.close(fig)
+    return "All_Tunnels_critical_velocity_comparison.png"
 
 if __name__ == "__main__":
     #Table 8 Typical TBM or Arched tunnel profiles
@@ -322,5 +282,5 @@ if __name__ == "__main__":
     
     # Generate comparison plot with all tunnels
     print("\nGenerating comparison plot for all tunnels...")
-    comparison_plot_file = plot_multiple_tunnels(Tunnels, fire, ambient_temp, ambient_density, for_web=False)
+    comparison_plot_file = create_comparison_plot(Tunnels, fire, ambient_temp, ambient_density)
     print(f"Comparison plot saved as: {comparison_plot_file}")
