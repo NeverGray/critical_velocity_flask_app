@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use('Agg')  # Use non-GUI backend
 import matplotlib.pyplot as plt
 
-from src.critical_velocity import Fire, Tunnel, iterate_critical_velocity, fire_response
+from src.critical_velocity import Fire, Tunnel, iterate_critical_velocity, plot_critical_velocity
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Replace with a secure key in production
@@ -96,48 +96,34 @@ def index():
             K_g = 1.0
             tol = 1e-6
             fire = Fire(hrr, intensity, width, epsilon, eta)
-            tunnel = Tunnel("User Tunnel", height, area, hydraulic_diameter)
-            critical_velocity = 2.0  # Initial guess
-            critical_velocity, dt = iterate_critical_velocity(
-                fire, tunnel, critical_velocity, ambient_temp, ambient_density, epsilon, eta, K_g, tol
-            )
-
-            # Format the results
-            critical_velocity = round(critical_velocity, 3)
-            dt = round(dt, 1)
+            tunnel = Tunnel("Web Tunnel", height, area, hydraulic_diameter)
 
             # Plotting
             plot_url = None
             try:
-                fig = fire_response(
-                    [tunnel],
-                    1e6,  # min_hrr
-                    200e6,  # max_hrr
-                    1e-5,  # tol
-                    float(ambient_temp),
-                    101325.0,  # ref_pressure
-                    float(intensity),
-                    float(width),
-                    float(epsilon),
-                    float(eta),
-                    1.0,  # K_g
-                    for_web=True
-                    )
+                fig, fire_hrr, critical_velocity, oxygen_depletion_msg = plot_critical_velocity(
+                    tunnel,
+                    fire,
+                    ambient_temp=ambient_temp,
+                    ambient_density=ambient_density,
+                )
                 buf = io.BytesIO()
                 fig.savefig(buf, format='png')
                 buf.seek(0)
                 plot_url = base64.b64encode(buf.getvalue()).decode('utf8')
                 plt.close(fig)
+
             except Exception as e:
                 plot_url = None
 
             return render_template(
                 'index.html',
-                critical_velocity=critical_velocity,
-                delta_t=dt,
+                critical_velocity=round(critical_velocity, 3),
+                fire_hrr=round(fire_hrr / 1e6, 1),  # Convert back to MW for display
                 form_values=form_values,
                 DEFAULTS=DEFAULTS,
-                plot_url=plot_url
+                plot_url=plot_url,
+                oxygen_depletion_msg=oxygen_depletion_msg
             )
 
         except ValueError:
@@ -163,4 +149,4 @@ def index():
     return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS)
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)

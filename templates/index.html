@@ -51,9 +51,11 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                 $$
             </div>
         </div>
-            <div class="mb-4" style="max-width: 600px;">
-        <strong>Empirical Factors and Constants:</strong>
-        <table class="table table-sm table-bordered text-center mt-2">
+            <!-- Centered Empirical Factors and Constants table -->
+            <div class="mb-4">
+    <strong>Empirical Factors and Constants:</strong>
+    <div class="d-flex justify-content-center">
+        <table class="table table-sm table-bordered text-center mt-2" style="max-width: 600px;">
             <thead class="thead-light">
                 <tr>
                     <th><em>f<sub>h</sub></em></th>
@@ -78,6 +80,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
             </tbody>
         </table>
     </div>
+</div>
         </div>
         <form method="POST" action="/" class="mt-4">
             <table class="table table-bordered w-auto">
@@ -217,7 +220,10 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
         {% if critical_velocity %}
         <div class="alert alert-success mt-4">
             <h4>Results</h4>
-            <p><strong>Total Fire Heat Release Rate:</strong> {{ form_values.hrr }} MW</p>
+            {% if oxygen_depletion_msg %}
+                <p></p>{{ oxygen_depletion_msg }}</p>
+            {% endif %}
+            <p><strong>Total Fire Heat Release Rate:</strong> {{ fire_hrr }} MW</p>
             <p><strong>Critical Velocity:</strong> {{ critical_velocity }} m/s</p>
         </div>
         {% endif %}

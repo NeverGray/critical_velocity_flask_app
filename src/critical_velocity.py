@@ -1,9 +1,9 @@
-# Project Name: Beyer-Stacey=Brenn CV Calculator
-# Description: Calculate Critical Velocity
+# Project Name: Beyer-Stacey=Brenn Critical Velocity (BSB-CV) Calculator
+# Description: Calculate and plot values for Critical Velocity
 # Copyright (c) 2025 Justin Edenbaum, Never Gray
 #
 # This file is licensed under the MIT License.
-# You may obtain a copy of the license at https://opensource.org/licenses/MIT
+# License is available at https://opensource.org/licenses/MIT
 
 from dataclasses import dataclass
 from matplotlib.ticker import MaxNLocator, AutoMinorLocator
@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib.lines as mlines
+import copy
 
 # Constants and empirical parameters
 g = 9.81 #Gravitaional acceleration (m/s^2)
@@ -105,13 +106,11 @@ def calculate_critical_velocity(fire, tunnel, delta_T, ambient_T):
 
     return K_F * np.sqrt((g * tunnel.height ** 3.0 / tunnel.hydraulic_diameter ** 2.0) * delta_T / (ambient_T + delta_T) )
 
-def iterate_critical_velocity(fire, tunnel, critical_velocity, ambient_T, ambient_density, epsilon, eta, K_g, tol):
+def iterate_critical_velocity(fire, tunnel, critical_velocity, ambient_T, ambient_density, K_g=1.0, tol=6.8e-6):
     """Iterative critical velocity calculation.
     """
-    fire.epsilon = epsilon
-    fire.eta = eta
     relaxation = 0.7 #Relaxation factor to reduce number of iterations
-    specific_heat = 1007.0
+    specific_heat = 1007.0 #Starting value for specific heat capacity of air (J/kg/K)
     while True:
         fire_dt = fire.hrr * (1.0 - fire.epsilon)*(1.0 - fire.eta) / (specific_heat * ambient_density * tunnel.area * critical_velocity)
         
@@ -131,108 +130,51 @@ def oxygen_depletion(fire_hrr, tunnel, ambient_density):
     vel_depletion = air_demand*fire_hrr*1.0e-6/(ambient_density*tunnel.area*heat_of_combustion*combustion_eff)
     return vel_depletion
 
+def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_density, for_web=True):
+    """ Generate a table of fire heat release rate vs critical velocity"""
+    fire_hrrs, critical_velocities, sufficient_oxygen = hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, for_web=for_web)
+    max_critical_velocity = max(critical_velocities)
+    max_fire_hrr = max(fire_hrrs)
 
-def plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambient_density, fire_intensity, fire_width, epsilon, eta, K_g, tol, for_web=True):
-    """Function to create a plot of critical velocity against HRR and return the figure and axis
-    """
-    fire_hrrs = np.linspace(min_hrr, max_hrr, 2001)
-    critical_velocity = np.empty_like(fire_hrrs)
-    critical_velocity[-1] = 1.0 #First Guess
-    delta_t = np.empty_like(fire_hrrs)
-    marker=0
-    for i, fire_hrr in enumerate(fire_hrrs):
-        fire = Fire(fire_hrr, fire_intensity, fire_width, epsilon, eta)
-        if marker == 0:
-            critical_velocity[i], delta_t[i] = iterate_critical_velocity(fire, tunnel, critical_velocity[i-1], ambient_temp, ambient_density, epsilon, eta, K_g, tol)
-        #HRR cut off if minimum oxygen requirement not met
-        if (critical_velocity[i] <= oxygen_depletion(fire_hrr, tunnel, ambient_density) and marker == 0):
-            vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
-            critical_velocity[i] = vel_depletion
-            hrr_depletion =  fire_hrr
-            fire_hrrs[i] = hrr_depletion
-            marker =1
-            print("!!!!HRR cut off due to oxygen depletion!!!!")
-        elif marker != 0:
-            critical_velocity[i] = vel_depletion
-            fire_hrrs[i] = hrr_depletion
-            
-    line, = ax.plot(fire_hrrs*1e-6, critical_velocity, label='')
-    if for_web:
-    # Add parameter values to the legend
-        param_lines = [
-            mlines.Line2D([], [], color='none', label=f"{'Fire intensity:':<16} {fire_intensity/1e6:>7.2f} MW/m²"),
-            mlines.Line2D([], [], color='none', label=f"{'Fire width:':<16} {fire_width:>7.2f} m"),
-            mlines.Line2D([], [], color='none', label=f"{'Heat reduction:':<16} {epsilon:>7.2f}"),
-            mlines.Line2D([], [], color='none', label=f"{'Tunnel Area:':<16} {tunnel.area:>7.2f} m²"),
-            mlines.Line2D([], [], color='none', label=f"{'Tunnel Height:':<16} {tunnel.height:>7.2f} m"),
-            mlines.Line2D([], [], color='none', label=f"{'Hydraulic Diam.:':<16} {tunnel.hydraulic_diameter:>7.2f} m"),
-            mlines.Line2D([], [], color='none', label=""),
-            mlines.Line2D([], [], color='none', label="Never Gray CV Calculator"),
-        ]
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(
-            handles + param_lines,
-            labels + [l.get_label() for l in param_lines],
-            loc='lower right',
-            prop={'family': 'monospace', 'size': 9}
-        )
-    else: #Save CSV Files
-        DF = pd.DataFrame(critical_velocity, fire_hrrs*1.0e-6)
-        DF.to_csv(f"{tunnel.name} .csv")
-    return fig, ax, float(np.nanmax(critical_velocity))
+    """ Check if there is sufficient oxygen for HRR inputted hr (fire.hrr) and maximum HRR on plot"""
+    if sufficient_oxygen:
+        oxygen_depletion_msg = "There is sufficient oxygen for the prescribed parameters in the figure below."
+        critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)
+    elif not sufficient_oxygen:
+        # The HRR could be cut off due to oxygen depletion
+        if fire.hrr < max_fire_hrr:
+            oxygen_depletion_msg = "The is insufficient oxygen for fires greater than {:.1f} MW".format( max_fire_hrr *1e-6)
+            critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)   
+        else:
+            oxygen_depletion_msg = "HRR cut off due to oxygen depletion at {:.1f} MW".format(fire_hrrs[np.where(critical_velocities == max_critical_velocity)][0]*1e-6)
+            fire.hrr = max_fire_hrr 
+            critical_velocity = max_critical_velocity
 
-
-
-def get_depletion_values(tunnel, min_hrr, max_hrr, ambient_temp, ambient_density, fire_intensity, fire_width, epsilon, eta, K_g, tol, for_web=True):
-    """Function to create a plot of critical velocity against HRR and return the figure and axis
-    """
-    fire_hrrs = np.linspace(min_hrr, max_hrr, 2001)
-    critical_velocity = np.empty_like(fire_hrrs)
-    critical_velocity[-1] = 1.0 #First Guess
-    delta_t = np.empty_like(fire_hrrs)
-    marker=0
-    hrr_depletion = max_hrr
-    vel_depletion = 0
-    
-    for i, fire_hrr in enumerate(fire_hrrs):
-        fire = Fire(fire_hrr, fire_intensity, fire_width, epsilon, eta)
-        if marker == 0:
-            critical_velocity[i], delta_t[i] = iterate_critical_velocity(fire, tunnel, critical_velocity[i-1], ambient_temp, ambient_density, epsilon, eta, K_g, tol)
-
-        #HRR cut off if minimum oxygen requirement not met
-        if (critical_velocity[i] <= oxygen_depletion(fire_hrr, tunnel, ambient_density) and marker == 0):
-            vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
-            critical_velocity[i] = vel_depletion
-            hrr_depletion =  fire_hrr
-            fire_hrrs[i] = hrr_depletion
-            marker =1
-            #print("!!!!HRR cut off due to oxygen depletion!!!!")
-        elif marker != 0:
-            critical_velocity[i] = vel_depletion
-            fire_hrrs[i] = hrr_depletion
-            
-    
-    return vel_depletion, hrr_depletion
-
-
-
-def fire_response(tunnels, min_hrr, max_hrr, tol, ambient_temp, ref_pressure, fire_intensity, fire_width, epsilon, eta, K_g, for_web=False):
-    """Function to summarise critical velocity calculation of a list of tunnels
-    """
-
-    ambient_density = ref_pressure/(287.0 * ambient_temp)  #Ambient density calculation based on reference pressure (kg/m^3)
+    """ Plot the data"""
     fig, ax = plt.subplots()
-    max_cv_all = 0.0
-
-    for tunnel in tunnels:
-        fig, ax, max_cv = plot_critical_velocity(fig, ax, tunnel, min_hrr, max_hrr, ambient_temp, ambient_density, fire_intensity, fire_width, epsilon, eta, K_g, tol)
-        max_cv_all = max(max_cv_all, max_cv)
-
-    x_max_mw = max_hrr * 1e-6
+    line, = ax.plot(fire_hrrs*1e-6, critical_velocities, label='')
+    param_lines = [
+        mlines.Line2D([], [], color='none', label=f"{'Fire intensity:':<16} {fire.intensity/1e6:>7.2f} MW/m²"),
+        mlines.Line2D([], [], color='none', label=f"{'Fire width:':<16} {fire.width:>7.2f} m"),
+        mlines.Line2D([], [], color='none', label=f"{'Heat reduction:':<16} {fire.epsilon:>7.2f}"),
+        mlines.Line2D([], [], color='none', label=f"{'Tunnel Area:':<16} {tunnel.area:>7.2f} m²"),
+        mlines.Line2D([], [], color='none', label=f"{'Tunnel Height:':<16} {tunnel.height:>7.2f} m"),
+        mlines.Line2D([], [], color='none', label=f"{'Hydraulic Diam.:':<16} {tunnel.hydraulic_diameter:>7.2f} m"),
+        mlines.Line2D([], [], color='none', label=""),
+        mlines.Line2D([], [], color='none', label="Never Gray CV Calculator"),
+    ]
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(
+        handles + param_lines,
+        labels + [l.get_label() for l in param_lines],
+        loc='lower right',
+        prop={'family': 'monospace', 'size': 9}
+    )
+    x_max_mw = max_fire_hrr * 1e-6
     x_top = min(round_up_nice(x_max_mw),150)
     
     # Use the overall maximum CV with headroom
-    ylim_max = 1.05 * max_cv_all if max_cv_all > 0 else 1.0  # 5% headroom
+    ylim_max = 1.05 * max_critical_velocity if max_critical_velocity > 0 else 1.0  # 5% headroom
     y_top = round_up_nice(ylim_max)
     
     # Matplotlib to pick major ticks using common steps
@@ -242,87 +184,143 @@ def fire_response(tunnels, min_hrr, max_hrr, tol, ambient_temp, ref_pressure, fi
         ax.xaxis.set_major_locator(MultipleLocator(tick_interval))
     else:
         ax.xaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
-    
-    ax.yaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
-    
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))  
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.yaxis.set_minor_locator(AutoMinorLocator())
-
     ax.set(title="Critical Velocity",
-           xlabel="Total Fire Heat Release Rate (MW)",
-           #xticks=np.arange(0.0, max_hrr*1.0e-6+1, 10.0),
-           xlim=[0.0, x_top],
-           ylabel="Critical Velocity (m/s)",
-           #yticks=np.arange(0.0, 4.1, 0.5),
-           ylim=[0.0, y_top])
+        xlabel="Total Fire Heat Release Rate (MW)",
+        xlim=[0.0, x_top],
+        ylabel="Critical Velocity (m/s)",
+        ylim=[0.0, y_top])
     ax.grid(True)
-
-    #ax.legend()
     fig.tight_layout()
     fig.set_size_inches(8.0, 4.5)
+
+    if for_web:
+        return fig, fire.hrr, critical_velocity, oxygen_depletion_msg
+    else:
+        #If not for web, save the data as a CSV file and png
+        DF = pd.DataFrame(critical_velocities, fire_hrrs*1.0e-6)
+        DF.to_csv(f"{tunnel.name} .csv")
+        fig.savefig(f"{tunnel.name}_critical_velocity.png")
+        plt.close(fig)
+        return fire.hrr, critical_velocity, oxygen_depletion_msg
+
+def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min_hrr_input=0.001e6, max_hrr_input=150e6, for_web=True):
+    """Function to create a table of critical velocities against HRR. The function checks if there is sufficient oxygen for the range of HRR.
+    """
+    # Set the range
+    min_hrr = min(min_hrr_input, max_hrr_input, fire.hrr) #HRR close to zero create high temperatures and lead to a specific heat capacity cut off
+    max_hrr = min(3*fire.hrr, max_hrr_input) #Maximum total fire heat release rate for plot (W)
+    fire_hrrs = np.linspace(min_hrr, max_hrr, 2001)
+    critical_velocities = np.empty_like(fire_hrrs)
+    critical_velocities[-1] = 2.0 #First Guess
+
+    delta_t = np.empty_like(fire_hrrs)
+    sufficient_oxygen = True
+    fire_copy = copy.deepcopy(fire) #Creates a copy so the originaly value of fire.hrr is retained.
+    for i, fire_hrr in enumerate(fire_hrrs):
+        fire_copy.hrr = fire_hrr
+        if sufficient_oxygen:
+            critical_velocities[i], delta_t[i] = iterate_critical_velocity(fire_copy, tunnel, critical_velocities[i-1], ambient_temp, ambient_density)
+            vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
+        #HRR cut off if minimum oxygen requirement not met
+            if (critical_velocities[i] <= vel_depletion):
+                print("!!!!HRR cut off due to oxygen depletion!!!!")
+                sufficient_oxygen = False
+                # Slice arrays to keep only valid data less than oxygen depletion
+                fire_hrrs = fire_hrrs[:i+1]
+                critical_velocities = critical_velocities[:i+1]
+                delta_t = delta_t[:i+1]
+                break
+    return fire_hrrs, critical_velocities, sufficient_oxygen
+
+def plot_multiple_tunnels(tunnels, fire, ambient_temp, ambient_density, for_web=False):
+    """Function to create a plot comparing critical velocities for multiple tunnels"""
+    fig, ax = plt.subplots()
     
-    if not for_web:
-        fig.savefig("Fire_response")
-        plt.show()    
+    max_critical_velocity = 0
+    max_fire_hrr = 0
+    
+    # Plot each tunnel
+    for tunnel in tunnels:
+        fire_hrrs, critical_velocities, sufficient_oxygen = hrrs_vs_critical_velocities(
+            tunnel, fire, ambient_temp, ambient_density, for_web=True
+        )
+        
+        # Plot the line for this tunnel
+        ax.plot(fire_hrrs*1e-6, critical_velocities, label=tunnel.name, linewidth=2)
+        
+        # Track maximum values for plot scaling
+        max_critical_velocity = max(max_critical_velocity, max(critical_velocities))
+        max_fire_hrr = max(max_fire_hrr, max(fire_hrrs))
+    
+    # Format Plot
+    x_max_mw = max_fire_hrr * 1e-6
+    x_top = min(round_up_nice(x_max_mw), 150)
+    
+    # Use the overall maximum CV with headroom
+    ylim_max = 1.05 * max_critical_velocity if max_critical_velocity > 0 else 1.0
+    y_top = round_up_nice(ylim_max)
+    
+    # Set up ticks
+    if x_top == 150:
+        tick_interval = x_top / 15
+        ax.xaxis.set_major_locator(MultipleLocator(tick_interval))
+    else:
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    
+    ax.set(title="Critical Velocity Comparison",
+           xlabel="Total Fire Heat Release Rate (MW)",
+           xlim=[0.0, x_top],
+           ylabel="Critical Velocity (m/s)",
+           ylim=[0.0, y_top])
+    ax.grid(True)
+    ax.legend(loc='best')
+    
+    fig.tight_layout()
+    fig.set_size_inches(10.0, 6.0)
+    
     if for_web:
         return fig
-    plt.close(fig)
+    else:
+        fig.savefig("All_Tunnels_critical_velocity_comparison.png", dpi=300)
+        plt.close(fig)
+        return "All_Tunnels_critical_velocity_comparison.png"
 
-def plot_values():
-# Input: Tunnel name, tunnel height (Ln or H) (m), tunnel area (m^2), hydraulic diameter (m)
-    Tunnel_A = Tunnel("Tunnel-A", 6.0, 30.0, 5.45)
-    Tunnel_B = Tunnel("Tunnel-B", 6.0, 30.0, 5.45)
+if __name__ == "__main__":
     #Table 8 Typical TBM or Arched tunnel profiles
-    TBM1 = Tunnel("TBM-1", 6.80, 85.48, 9.06)
+    TBM1 = Tunnel("TBM-1", 6.80, 85.38, 9.06)
     TBM2 = Tunnel("TBM-2", 8.07, 85.60, 9.28)
     TBM3 = Tunnel("TBM-3", 9.82, 106.0, 10.7)
     TBM4 = Tunnel("TBM-4", 5.00, 40.00, 5.99)
     TBM5 = Tunnel("TBM-5", 5.89, 40.00, 6.44)
     TBM6 = Tunnel("TBM-6", 7.86, 59.95, 8.13)
-    TBMs = [TBM1, TBM2, TBM3, TBM4, TBM5, TBM6]
-# Input: List of tunnel names, minimum HRR (W), maximum HRR (W), tolerance of iterative calculations, ambient temperature (K), 
-#        reference pressure (Pa), fire intensity (MW/m^2), fire width (m), epsilon (-), eta (-), grade factor (-)
-#Suggested parameters: [Tunnel_A], 1e6, 150e6, 1e-6, 294, 101325.0, 2.25e6, 2.5, 0.2, 0.0, 1.0
-    fire_response(TBMs, min_hrr, max_hrr, 1e-5, 294, 101325.0, 2.25e6, 2.5, 0.2, 0.0, 1.0)
+    Cut_off = Tunnel("Cut-off", 3, 9, 3)
+    Tunnels = [TBM1, TBM2, TBM3, TBM4, TBM5, TBM6, Cut_off]
     
-if __name__ == "__main__":
     #Fire parameters
-    hrr = 70e6 #Toal fire heat release rate for critical velocity value output (W)
-    min_hrr_input = 0.001e6 #Minimum toal fire heat release rate for plot (W)
-    max_hrr_input = min(3*hrr,150e6) #Maximum toal fire heat release rate for plot (W)
-    min_hrr = max(0.0001e6,min(min_hrr_input,max_hrr_input, hrr)) #HRR close to zero create high temperatures and lead to a specific heat capacity cut off
-    max_hrr = max(max_hrr_input,hrr,min_hrr_input)
-    fire_intensity= 2.25e6 #Fire intensity (W/m^2)
-    fire_width = 2.5 #Maximum width of the fire (m)
+    hrr = 50.0e6 #Total fire heat release rate (W)
+    intensity = 2.25e6 #Fire intensity (W/m^2)
+    width = 2.5 #Maximum width of the fire (m)
     epsilon = 0.2 #Heat reduction due to imperfect combustion and thermal radiation (-)
     eta = 0.0 #Reduction of the convective heat release rate due to water mist systems or sprinklers (-)
-    fire = Fire(hrr, fire_intensity, fire_width, epsilon, eta)
-    #Tunnel paraemters
-    name = "TBM-1"
-    height = 3 #Tunnel height for simplified equation and design purpose or tunnel height from the base of the fire to highest point at the ceiling (m)
-    area = 9 #Tunnel cross-sectional area at the fire site (m^2)
-    hydraulic_diameter = 3 #Tunnel hydraulic diameter at the fire location (m)
-    tunnel = Tunnel(name, height, area, hydraulic_diameter)
+    fire = Fire(hrr, intensity, width, epsilon, eta)
+
     #Ambient, reference and initial parameters
     ambient_temp = 294.0 #Ambient temperature in Kelvin (K)
-    ref_pressure = 101325 #Reference pressure for density calculation (Pa)
-    ambient_density = ref_pressure/(287*ambient_temp) #Ambient density based on reference pressure and ambient temperature (kg/m^3)
-    K_g = 1.0 #Grade factor (-)
-    tol = 6.8e-6 #for critical velocity iteration
-    critical_velocity = 1.0 #Initial guess of critical velocity to start iteration (m/s)
+    ambient_density = 1.2 #Ambient density (kg/m^3)
+    critical_velocity = 2.0 #Initial guess of critical velocity to start iteration (m/s)
     
+    # Generate individual plots for each tunnel
+    for tunnel in Tunnels:
+        hrr, critical_velocity, oxygen_depletion_msg = plot_critical_velocity(tunnel, fire, ambient_temp, ambient_density, for_web=False)
+        print(f"Tunnel : {tunnel.name}, Critical Velocity: {critical_velocity:.3f} m/s, HRR: {hrr*1e-6:.1f} MW")
     
-    vel_depletion, hrr_depletion = get_depletion_values(tunnel, min_hrr, max_hrr, ambient_temp, ambient_density, fire_intensity, fire_width, epsilon, eta, K_g, tol)
-    
-    if (hrr_depletion < hrr):
-        hrr = hrr_depletion
-        critical_velocity = vel_depletion
-        print("!!!!HRR cut off due to oxygen depletion!!!!")
-    else:
-        critical_velocity, dt = iterate_critical_velocity(fire, tunnel, critical_velocity, ambient_temp, ambient_density, epsilon, eta, K_g, tol)
-     
-                
-    
-    print(f"Critical Velocity: {critical_velocity:.3f} m/s, HRR: {hrr*1e-6:.1f} MW")
-    #fire_response([tunnel], min_hrr, max_hrr, tol, ambient_temp, ref_pressure, fire_intensity, fire_width, epsilon, eta, K_g)
-    
+    # Generate comparison plot with all tunnels
+    print("\nGenerating comparison plot for all tunnels...")
+    comparison_plot_file = plot_multiple_tunnels(Tunnels, fire, ambient_temp, ambient_density, for_web=False)
+    print(f"Comparison plot saved as: {comparison_plot_file}")

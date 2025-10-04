@@ -19,3 +19,5 @@ instance/
 dist/
 build/
 *.bak
+*.png
+*.csv
