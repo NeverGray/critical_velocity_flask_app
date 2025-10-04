@@ -149,4 +149,4 @@ def index():
     return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
