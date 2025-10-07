@@ -1,15 +1,15 @@
 # Critical Velocity Flask Application
 
-This project is a Flask web application that calculates the critical velocity of a fire in a tunnel based on user input. It utilizes the calculations defined in the `src/critical_velocity.py` file.
+This project is a Flask web application that calculates the critical velocity of a fire in a tunnel based on user input. The calculatioin is in the `src/critical_velocity.py` file.
 
 ## Project Structure
 
 ```
 critical_velocity_flask_app
-├── app.py                  # Main entry point of the Flask application
+├── app.py                  # Main entry point of the Flask application (Directions for the Web-site)
 ├── requirements.txt        # Lists the dependencies required for the project
 ├── src
-│   ├── critical_velocity.py # Contains the logic for calculating critical velocity
+│   ├── critical_velocity.py # Contains the logic for critical velocity calculation
 ├── templates
 │   └── index.html          # HTML template for the web page
 └── README.md               # Documentation for the project

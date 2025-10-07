@@ -130,8 +130,11 @@ def oxygen_depletion(fire_hrr, tunnel, ambient_density):
     vel_depletion = air_demand*fire_hrr*1.0e-6/(ambient_density*tunnel.area*heat_of_combustion*combustion_eff)
     return vel_depletion
 
-def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_density, for_web=True):
+def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web=True):
     """Generate a plot of fire heat release rate vs critical velocity - optimized version"""
+    # Calculate the density for the ambient pressure
+    ambient_density = ambient_pressure/(287.0 * ambient_temp)  #Ambient density calculation based on ambient pressure (kg/m^3)
+    
     # Get data and calculate maximums in one step
     fire_hrrs, critical_velocities, sufficient_oxygen = hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, for_web=for_web)
     max_critical_velocity = max(critical_velocities)
@@ -139,7 +142,7 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_density, for_web=
 
     # Determine oxygen status and critical velocity
     if sufficient_oxygen:
-        oxygen_depletion_msg = "There is sufficient oxygen for the prescribed parameters in the figure below."
+        oxygen_depletion_msg = "There is sufficient oxygen for the parameters in the figure."
         critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)
     else:
         if fire.hrr < max_fire_hrr:
@@ -270,17 +273,17 @@ if __name__ == "__main__":
     eta = 0.0 #Reduction of the convective heat release rate due to water mist systems or sprinklers (-)
     fire = Fire(hrr, intensity, width, epsilon, eta)
 
-    #Ambient, reference and initial parameters
+    #Ambient and initial parameters
     ambient_temp = 294.0 #Ambient temperature in Kelvin (K)
-    ambient_density = 1.2 #Ambient density (kg/m^3)
+    ambient_pressure = 101325 #Ambient pressure (Pa)
     critical_velocity = 2.0 #Initial guess of critical velocity to start iteration (m/s)
     
     # Generate individual plots for each tunnel
     for tunnel in Tunnels:
-        hrr, critical_velocity, oxygen_depletion_msg = plot_critical_velocity(tunnel, fire, ambient_temp, ambient_density, for_web=False)
+        hrr, critical_velocity, oxygen_depletion_msg = plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web=False)
         print(f"Tunnel : {tunnel.name}, Critical Velocity: {critical_velocity:.3f} m/s, HRR: {hrr*1e-6:.1f} MW")
     
     # Generate comparison plot with all tunnels
     print("\nGenerating comparison plot for all tunnels...")
-    comparison_plot_file = create_comparison_plot(Tunnels, fire, ambient_temp, ambient_density)
+    comparison_plot_file = create_comparison_plot(Tunnels, fire, ambient_temp, ambient_pressure)
     print(f"Comparison plot saved as: {comparison_plot_file}")

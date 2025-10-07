@@ -21,3 +21,4 @@ build/
 *.bak
 *.png
 *.csv
+*.code-workspace

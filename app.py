@@ -26,7 +26,7 @@ def index():
         'epsilon': 0.2,          # Heat reduction due to imperfect combustion
         'eta': 0.0,               # Reduction of convective heat release
         'ambient_temp': 294,   # Temperature of upstream air (K)
-        'ambient_density': 1.2    # Ambient density (kg/m³)
+        'ambient_pressure': 101325    # Ambient pressure (Pa)
     }
 
     form_values = {}
@@ -53,8 +53,8 @@ def index():
             use_default_ambient_temp = 'use_default_ambient_temp' in request.form
             ambient_temp = DEFAULTS['ambient_temp'] if use_default_ambient_temp else request.form['ambient_temp']
 
-            use_default_ambient_density = 'use_default_ambient_density' in request.form
-            ambient_density = DEFAULTS['ambient_density'] if use_default_ambient_density else request.form['ambient_density']
+            use_default_ambient_pressure = 'use_default_ambient_pressure' in request.form
+            ambient_pressure = DEFAULTS['ambient_pressure'] if use_default_ambient_pressure else request.form['ambient_pressure']
 
             hydraulic_diameter = request.form['hydraulic_diameter']
 
@@ -69,13 +69,13 @@ def index():
                 'epsilon': epsilon,
                 'eta': eta,
                 'ambient_temp': ambient_temp,
-                'ambient_density': ambient_density,
+                'ambient_pressure': ambient_pressure,
                 'use_default_intensity': use_default_intensity,
                 'use_default_width': use_default_width,
                 'use_default_epsilon': use_default_epsilon,
                 'use_default_eta': use_default_eta,
                 'use_default_ambient_temp': use_default_ambient_temp,
-                'use_default_ambient_density': use_default_ambient_density
+                'use_default_ambient_pressure': use_default_ambient_pressure
             }
 
             # Convert to float for calculation
@@ -91,7 +91,7 @@ def index():
             eta = float(eta)
             #Ambient Properties
             ambient_temp = float(ambient_temp)
-            ambient_density = float(ambient_density)
+            ambient_pressure = float(ambient_pressure)
             # Default Constants
             K_g = 1.0
             tol = 1e-6
@@ -105,7 +105,7 @@ def index():
                     tunnel,
                     fire,
                     ambient_temp=ambient_temp,
-                    ambient_density=ambient_density,
+                    ambient_pressure=ambient_pressure,
                 )
                 buf = io.BytesIO()
                 fig.savefig(buf, format='png')
@@ -137,14 +137,14 @@ def index():
         'use_default_epsilon': True,
         'use_default_eta': True,
         'use_default_ambient_temp': True,
-        'use_default_ambient_density': True,
+        'use_default_ambient_pressure': True,
         # Optionally, set the default values for the fields as well:
         'intensity': DEFAULTS['intensity'],
         'width': DEFAULTS['width'],
         'epsilon': DEFAULTS['epsilon'],
         'eta': DEFAULTS['eta'],
         'ambient_temp': DEFAULTS['ambient_temp'],
-        'ambient_density': DEFAULTS['ambient_density'],
+        'ambient_pressure': DEFAULTS['ambient_pressure'],
     }
     return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS)
 

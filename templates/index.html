@@ -201,16 +201,16 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                         </td>
                     </tr>
                     <tr>
-                        <td><strong>\( \rho_a \)</strong></td>
-                        <td>Ambient Density</td>
-                        <td>kg/m³</td>
+                        <td><strong>\( P_a \)</strong></td>
+                        <td>Ambient Pressure</td>
+                        <td>Pa</td>
                         <td class="text-center">
-                            <input type="checkbox" name="use_default_ambient_density" id="use_default_ambient_density"
-                                {% if form_values.use_default_ambient_density %}checked{% endif %}
-                                onchange="toggleDefault('ambient_density', {{ DEFAULTS.ambient_density }})">
+                            <input type="checkbox" name="use_default_ambient_pressure" id="use_default_ambient_pressure"
+                                {% if form_values.use_default_ambient_pressure %}checked{% endif %}
+                                onchange="toggleDefault('ambient_pressure', {{ DEFAULTS.ambient_pressure }})">
                         </td>
                         <td>
-                            <input type="number" class="form-control" id="ambient_density" name="ambient_density" step="any" required value="{{ form_values.ambient_density|default(DEFAULTS.ambient_density) }}" {% if form_values.use_default_ambient_density %}readonly{% endif %}>
+                            <input type="number" class="form-control" id="ambient_pressure" name="ambient_pressure" step="any" required value="{{ form_values.ambient_pressure|default(DEFAULTS.ambient_pressure) }}" {% if form_values.use_default_ambient_pressure %}readonly{% endif %}>
                         </td>
                     </tr>
                 </tbody>
