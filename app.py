@@ -28,73 +28,156 @@ def index():
         'ambient_temp': 294,   # Temperature of upstream air (K)
         'ambient_pressure': 101325    # Ambient pressure (Pa)
     }
+    
+    # Form field definitions - this makes the HTML much more maintainable
+    FORM_FIELDS = [
+        {
+            'category': 'Tunnel Properties',
+            'fields': [
+                {
+                    'name': 'height',
+                    'symbol': r'\( L_n \)',
+                    'description': 'Characteristic length (height) for natural convection (for pool fires: tunnel height from the base of the fire to highest point at the ceiling)',
+                    'unit': 'm',
+                    'has_default': False,
+                    'required': True
+                },
+                {
+                    'name': 'area',
+                    'symbol': r'\( A \)',
+                    'description': 'Tunnel cross-sectional area at the fire site',
+                    'unit': 'm²',
+                    'has_default': False,
+                    'required': True
+                },
+                {
+                    'name': 'hydraulic_diameter',
+                    'symbol': r'\( D_h \)',
+                    'description': 'Tunnel hydraulic diameter at the fire location',
+                    'unit': 'm',
+                    'has_default': False,
+                    'required': True
+                }
+            ]
+        },
+        {
+            'category': 'Fire Properties',
+            'fields': [
+                {
+                    'name': 'hrr',
+                    'symbol': r'\( \dot{Q} \)',
+                    'description': 'Total fire heat release rate',
+                    'unit': 'MW',
+                    'has_default': False,
+                    'required': True
+                },
+                {
+                    'name': 'intensity',
+                    'symbol': r'\( I_{fire} \)',
+                    'description': 'Fire intensity (heat release rate per unit area)<br><small>e.g. pool fire with oil fuel 2.25 MW/m²</small>',
+                    'unit': 'MW/m²',
+                    'has_default': True,
+                    'default_value': DEFAULTS['intensity'],
+                    'required': True
+                },
+                {
+                    'name': 'width',
+                    'symbol': r'\( W_{fire} \)',
+                    'description': 'Maximum width of the fire source<br><small>e.g. fire pans of Memorial Tunnel tests were 3.66 m wide</small>',
+                    'unit': 'm',
+                    'has_default': True,
+                    'default_value': DEFAULTS['width'],
+                    'required': True
+                },
+                {
+                    'name': 'epsilon',
+                    'symbol': r'\( \epsilon \)',
+                    'description': 'Heat reduction due to imperfect combustion and thermal radiation',
+                    'unit': '-',
+                    'has_default': True,
+                    'default_value': DEFAULTS['epsilon'],
+                    'required': True
+                },
+                {
+                    'name': 'eta',
+                    'symbol': r'\( \eta \)',
+                    'description': 'Reduction of the convective heat release rate due to water mist systems or sprinklers',
+                    'unit': '-',
+                    'has_default': True,
+                    'default_value': DEFAULTS['eta'],
+                    'required': True
+                }
+            ]
+        },
+        {
+            'category': 'Ambient Properties',
+            'fields': [
+                {
+                    'name': 'ambient_temp',
+                    'symbol': r'\( T_a \)',
+                    'description': 'Temperature of upstream air',
+                    'unit': 'K',
+                    'has_default': True,
+                    'default_value': DEFAULTS['ambient_temp'],
+                    'required': True
+                },
+                {
+                    'name': 'ambient_pressure',
+                    'symbol': r'\( P_a \)',
+                    'description': 'Ambient Pressure',
+                    'unit': 'Pa',
+                    'has_default': True,
+                    'default_value': DEFAULTS['ambient_pressure'],
+                    'required': True
+                }
+            ]
+        }
+    ]
 
     form_values = {}
     if request.method == 'POST':
         try:
-            # User Input
-            hrr = request.form['hrr']
-            height = request.form['height']
-            area = request.form['area']
-
-            # Handle defaults for each variable
-            use_default_intensity = 'use_default_intensity' in request.form
-            intensity = DEFAULTS['intensity'] if use_default_intensity else request.form['intensity']
-
-            use_default_width = 'use_default_width' in request.form
-            width = DEFAULTS['width'] if use_default_width else request.form['width']
-
-            use_default_epsilon = 'use_default_epsilon' in request.form
-            epsilon = DEFAULTS['epsilon'] if use_default_epsilon else request.form['epsilon']
-
-            use_default_eta = 'use_default_eta' in request.form
-            eta = DEFAULTS['eta'] if use_default_eta else request.form['eta']
-
-            use_default_ambient_temp = 'use_default_ambient_temp' in request.form
-            ambient_temp = DEFAULTS['ambient_temp'] if use_default_ambient_temp else request.form['ambient_temp']
-
-            use_default_ambient_pressure = 'use_default_ambient_pressure' in request.form
-            ambient_pressure = DEFAULTS['ambient_pressure'] if use_default_ambient_pressure else request.form['ambient_pressure']
-
-            hydraulic_diameter = request.form['hydraulic_diameter']
-
-            # Save for repopulation
-            form_values = {
-                'height': height,
-                'area': area,
-                'hydraulic_diameter': hydraulic_diameter,
-                'hrr': hrr,
-                'intensity': intensity,
-                'width': width,
-                'epsilon': epsilon,
-                'eta': eta,
-                'ambient_temp': ambient_temp,
-                'ambient_pressure': ambient_pressure,
-                'use_default_intensity': use_default_intensity,
-                'use_default_width': use_default_width,
-                'use_default_epsilon': use_default_epsilon,
-                'use_default_eta': use_default_eta,
-                'use_default_ambient_temp': use_default_ambient_temp,
-                'use_default_ambient_pressure': use_default_ambient_pressure
-            }
+            # Process form data dynamically using our field definitions
+            form_values = {}
+            processed_values = {}
+            
+            # Get all field names from our structure
+            all_fields = []
+            for category in FORM_FIELDS:
+                all_fields.extend(category['fields'])
+            
+            # Process each field
+            for field in all_fields:
+                field_name = field['name']
+                use_default_key = f'use_default_{field_name}'
+                
+                # Check if using default
+                use_default = use_default_key in request.form
+                form_values[use_default_key] = use_default
+                
+                # Get the value
+                if use_default and field.get('has_default'):
+                    value = field['default_value']
+                else:
+                    value = request.form[field_name]
+                
+                form_values[field_name] = value
+                processed_values[field_name] = value
 
             # Convert to float for calculation
             #Tunnel Properties
-            height = float(height)
-            area = float(area)
-            hydraulic_diameter = float(hydraulic_diameter)
+            height = float(processed_values['height'])
+            area = float(processed_values['area'])
+            hydraulic_diameter = float(processed_values['hydraulic_diameter'])
             #Fire Properties
-            hrr = float(hrr)*1e6 # Convert MW to W
-            intensity = float(intensity)*1e6 # Convert MW/m² to W/m²
-            width = float(width)
-            epsilon = float(epsilon)
-            eta = float(eta)
+            hrr = float(processed_values['hrr'])*1e6 # Convert MW to W
+            intensity = float(processed_values['intensity'])*1e6 # Convert MW/m² to W/m²
+            width = float(processed_values['width'])
+            epsilon = float(processed_values['epsilon'])
+            eta = float(processed_values['eta'])
             #Ambient Properties
-            ambient_temp = float(ambient_temp)
-            ambient_pressure = float(ambient_pressure)
-            # Default Constants
-            K_g = 1.0
-            tol = 1e-6
+            ambient_temp = float(processed_values['ambient_temp'])
+            ambient_pressure = float(processed_values['ambient_pressure'])
             fire = Fire(hrr, intensity, width, epsilon, eta)
             tunnel = Tunnel("Web Tunnel", height, area, hydraulic_diameter)
 
@@ -122,6 +205,7 @@ def index():
                 fire_hrr=round(fire_hrr / 1e6, 1),  # Convert back to MW for display
                 form_values=form_values,
                 DEFAULTS=DEFAULTS,
+                FORM_FIELDS=FORM_FIELDS,
                 plot_url=plot_url,
                 oxygen_depletion_msg=oxygen_depletion_msg
             )
@@ -130,23 +214,16 @@ def index():
             flash('Please enter valid numerical values for all fields.')
             return redirect(url_for('index'))
 
-    # For GET: set all use_default_* to True
-    form_values = {
-        'use_default_intensity': True,
-        'use_default_width': True,
-        'use_default_epsilon': True,
-        'use_default_eta': True,
-        'use_default_ambient_temp': True,
-        'use_default_ambient_pressure': True,
-        # Optionally, set the default values for the fields as well:
-        'intensity': DEFAULTS['intensity'],
-        'width': DEFAULTS['width'],
-        'epsilon': DEFAULTS['epsilon'],
-        'eta': DEFAULTS['eta'],
-        'ambient_temp': DEFAULTS['ambient_temp'],
-        'ambient_pressure': DEFAULTS['ambient_pressure'],
-    }
-    return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS)
+    # For GET: set defaults dynamically based on field definitions
+    form_values = {}
+    for category in FORM_FIELDS:
+        for field in category['fields']:
+            field_name = field['name']
+            if field.get('has_default'):
+                form_values[f'use_default_{field_name}'] = True
+                form_values[field_name] = field['default_value']
+    
+    return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS, FORM_FIELDS=FORM_FIELDS)
 
 if __name__ == '__main__':
     app.run(debug=False)

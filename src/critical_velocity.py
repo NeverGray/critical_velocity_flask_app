@@ -1,4 +1,4 @@
-# Project Name: Beyer-Stacey=Brenn Critical Velocity (BSB-CV) Calculator
+# Project Name: Beyer-Stacey-Brenn Critical Velocity (BSB-CV) Calculator
 # Description: Calculate and plot values for Critical Velocity
 # Copyright (c) 2025 Justin Edenbaum, Never Gray
 #
@@ -75,12 +75,12 @@ def air_specific_heat(T1, T2):
         return cp_air_high(3000.0)       
 
 def round_up_nice(val):
-    """ Function to round up to a "nice" value: 1, 2, 2.5, 5, 10 × 10^k"""
+    """ Function to round up to a "nice" value: 1, 1.5, 2, 2.5, 5, 7.5, 10 × 10^k"""
     if val <= 0:
         return 1.0
     exp = np.floor(np.log10(val))
     frac = val / (10**exp)
-    for step in [1, 2, 2.5, 5, 7.5, 10]:
+    for step in [1, 1.5, 2, 2.5, 5, 7.5, 10]:
         if frac <= step:
             return step * (10**exp)
     return 10 * (10**exp)
@@ -142,7 +142,7 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web
 
     # Determine oxygen status and critical velocity
     if sufficient_oxygen:
-        oxygen_depletion_msg = "There is sufficient oxygen for the parameters in the figure."
+        oxygen_depletion_msg = "" # No message if sufficient oxygen
         critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)
     else:
         if fire.hrr < max_fire_hrr:
@@ -215,10 +215,14 @@ def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min
 
 def format_cv_plot_axes(ax, max_hrr_mw, max_cv, title):
     """Common formatting for critical velocity plots"""
-    x_top = min(round_up_nice(max_hrr_mw), 150)
+    x_top = round_up_nice(max_hrr_mw)
     y_top = round_up_nice(1.05 * max_cv)
     
-    ax.xaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
+    if x_top == 150:
+        tick_internval = x_top / 15
+        ax.xaxis.set_major_locator(MultipleLocator(tick_internval))
+    else:
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
     ax.yaxis.set_major_locator(MaxNLocator(nbins=10, steps=[1, 2, 2.5, 5, 7.5, 10]))
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.yaxis.set_minor_locator(AutoMinorLocator())
