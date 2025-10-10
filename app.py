@@ -123,7 +123,7 @@ def index():
                 },
                 {
                     'name': 'ambient_pressure',
-                    'symbol': r'\( P_a \)',
+                    'symbol': r'\( p_a \)',
                     'description': 'Ambient Pressure',
                     'unit': 'Pa',
                     'has_default': True,
