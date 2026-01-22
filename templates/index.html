@@ -17,6 +17,22 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
 
 <body>
     <div class="container">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="mt-3">
+              {% for message in messages %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="alert-dismissible">&times;</span>
+                  </button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
         <!-- <h1 class="mt-5">Critical Velocity Calculator</h1>-->
             <div class="mt-4 mb-4" style="text-align: left;">
             <strong>Key Formulas:</strong>
@@ -111,7 +127,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                                name="use_default_{{ field.name }}" 
                                                id="use_default_{{ field.name }}"
                                                {% if form_values.get('use_default_' + field.name) %}checked{% endif %}
-                                               onchange="toggleDefault('{{ field.name }}', {{ field.default_value }})">
+                                               onchange="toggleDefault('{{ field.name }}', '{{ field.default_value }}')">
                                     {% endif %}
                                 </td>
                                 <td>
@@ -121,6 +137,7 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
                                            name="{{ field.name }}" 
                                            step="any" 
                                            {% if field.required %}required{% endif %}
+                                           {% if field.greater_than_zero %}min="0.01"{% endif %}
                                            value="{{ form_values.get(field.name, field.default_value if field.has_default else '') }}"
                                            {% if field.has_default and form_values.get('use_default_' + field.name) %}readonly{% endif %}>
                                 </td>
@@ -136,6 +153,9 @@ Licensed under the MIT License. https://opensource.org/licenses/MIT
             <h4>Results</h4>
             {% if oxygen_depletion_msg %}
                 <p></p>{{ oxygen_depletion_msg }}</p>
+            {% endif %}
+            {% if converging_msg %}
+                <p></p>{{ converging_msg }}</p>
             {% endif %}
             <p><strong>Total Fire Heat Release Rate:</strong> {{ fire_hrr }} MW</p>
             <p><strong>Critical Velocity:</strong> {{ critical_velocity }} m/s</p>

@@ -112,6 +112,7 @@ def iterate_critical_velocity(fire, tunnel, critical_velocity, ambient_T, ambien
     """
     relaxation = 0.7 #Relaxation factor to reduce number of iterations
     specific_heat = 1007.0 #Starting value for specific heat capacity of air (J/kg/K)
+    iter = 0
     while True:
         fire_dt = fire.hrr * (1.0 - fire.epsilon)*(1.0 - fire.eta) / (specific_heat * ambient_density * tunnel.area * critical_velocity)
         
@@ -119,8 +120,9 @@ def iterate_critical_velocity(fire, tunnel, critical_velocity, ambient_T, ambien
         old_critical_velocity = critical_velocity
         dt = calculate_delta_t(fire, tunnel, critical_velocity, ambient_density, specific_heat)
         critical_velocity = relaxation*calculate_critical_velocity(fire, tunnel, dt, ambient_T)+ (1.0-relaxation)*old_critical_velocity
-        if abs(critical_velocity - old_critical_velocity) < tol:
-            return critical_velocity*K_g, dt #Grade factor applied after the iteration according to Equation (28)
+        iter += 1
+        if abs(critical_velocity - old_critical_velocity) < tol or iter > 100:
+            return critical_velocity*K_g, dt, iter #Grade factor applied after the iteration according to Equation (28)
 
 def oxygen_depletion(fire_hrr, tunnel, ambient_density):
     """Correlation for minimum required oxygen demand (minimum upstream air velocity) based on tunnel parameters and HRR
@@ -137,23 +139,27 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web
     ambient_density = ambient_pressure/(287.0 * ambient_temp)  #Ambient density calculation based on ambient pressure (kg/m^3)
     
     # Get data and calculate maximums in one step
-    fire_hrrs, critical_velocities, sufficient_oxygen = hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, for_web=for_web)
+    fire_hrrs, critical_velocities, sufficient_oxygen, converging_msg = hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, for_web=for_web)
     max_critical_velocity = max(critical_velocities)
     max_fire_hrr = max(fire_hrrs)
 
     # Determine oxygen status and critical velocity
+    iter = 0
     if sufficient_oxygen:
         oxygen_depletion_msg = "" # No message if sufficient oxygen
-        critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)
+        critical_velocity, dt, iter = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)
     else:
         if fire.hrr < max_fire_hrr:
             oxygen_depletion_msg = f"There is insufficient oxygen for fires greater than {max_fire_hrr *1e-6:.1f} MW"
-            critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)   
+            critical_velocity, dt, iter = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)   
         else:
             oxygen_depletion_msg = f"HRR cut off due to oxygen depletion at {max_fire_hrr*1e-6:.1f} MW"
             fire.hrr = max_fire_hrr 
             critical_velocity = max_critical_velocity
 
+    if iter > 100:
+        converging_msg = "WARNING! Critical velocity calculation did not converge. Please check input parameters."
+    
     # Create plot with streamlined formatting
     fig, ax = plt.subplots(figsize=(8.0, 4.5))
     ax.plot(fire_hrrs*1e-6, critical_velocities)
@@ -178,13 +184,13 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web
     fig.tight_layout()
 
     if for_web:
-        return fig, fire.hrr, critical_velocity, oxygen_depletion_msg
+        return fig, fire.hrr, critical_velocity, oxygen_depletion_msg, converging_msg
     else:
         # Save files efficiently
-        pd.DataFrame(critical_velocities, fire_hrrs*1.0e-6).to_csv(f"{tunnel.name} .csv")
+        pd.DataFrame(critical_velocities, fire_hrrs*1.0e-6).to_csv(f"{tunnel.name}_critical_velocity.csv")
         fig.savefig(f"{tunnel.name}_critical_velocity.png")
         plt.close(fig)
-        return fire.hrr, critical_velocity, oxygen_depletion_msg
+        return fire.hrr, critical_velocity, oxygen_depletion_msg, converging_msg
 
 def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min_hrr_input=0.001e6, max_hrr_input=150e6, for_web=True):
     """Function to create a table of critical velocities against HRR. The function checks if there is sufficient oxygen for the range of HRR.
@@ -194,6 +200,7 @@ def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min
     max_hrr = min(3*fire.hrr, max(max_hrr_input, fire.hrr)) #Maximum total fire heat release rate for plot (W)
     acceptable_resolution = 1000 #Minimum number of plot points for acceptable resolution
     insufficient_resolution = True #Initial resolution set to True to start calculation
+    converging_msg = ""
     while insufficient_resolution:
         fire_hrrs = np.linspace(min_hrr, max_hrr, 2001)
         critical_velocities = np.empty_like(fire_hrrs)
@@ -204,9 +211,9 @@ def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min
         for i, fire_hrr in enumerate(fire_hrrs):
             fire_copy.hrr = fire_hrr
             if sufficient_oxygen:
-                critical_velocities[i], delta_t[i] = iterate_critical_velocity(fire_copy, tunnel, critical_velocities[i-1], ambient_temp, ambient_density)
+                critical_velocities[i], delta_t[i], iter = iterate_critical_velocity(fire_copy, tunnel, critical_velocities[i-1], ambient_temp, ambient_density)
                 vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
-            #HRR cut off if minimum oxygen requirement not met
+                #HRR cut off if minimum oxygen requirement not met
                 if (critical_velocities[i] <= vel_depletion):
                     print("!!!!HRR cut off due to oxygen depletion!!!!")
                     sufficient_oxygen = False
@@ -216,8 +223,10 @@ def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min
                     delta_t = delta_t[:i+1]
                     max_hrr = fire_hrrs[i]
                     break
+            if iter > 100:
+                converging_msg = "WARNING! Critical velocity calculation did not converge. Please check input parameters."
         if len(fire_hrrs) > acceptable_resolution: insufficient_resolution = False
-    return fire_hrrs, critical_velocities, sufficient_oxygen
+    return fire_hrrs, critical_velocities, sufficient_oxygen, converging_msg
 
 def format_cv_plot_axes(ax, max_hrr_mw, max_cv, title):
     """Common formatting for critical velocity plots"""
@@ -243,7 +252,7 @@ def create_comparison_plot(tunnels, fire, ambient_temp, ambient_density):
     
     # Single call per tunnel - get data, plot, and track maximums
     for tunnel in tunnels:
-        fire_hrrs, critical_velocities, _ = hrrs_vs_critical_velocities(
+        fire_hrrs, critical_velocities, _, _ = hrrs_vs_critical_velocities(
             tunnel, fire, ambient_temp, ambient_density, for_web=True)
         ax.plot(fire_hrrs*1e-6, critical_velocities, label=tunnel.name, linewidth=2)
         
@@ -286,7 +295,7 @@ if __name__ == "__main__":
     
     # Generate individual plots for each tunnel
     for tunnel in Tunnels:
-        hrr, critical_velocity, oxygen_depletion_msg = plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web=False)
+        hrr, critical_velocity, oxygen_depletion_msg, converging_msg = plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web=False)
         print(f"Tunnel : {tunnel.name}, Critical Velocity: {critical_velocity:.3f} m/s, HRR: {hrr*1e-6:.1f} MW")
     
     # Generate comparison plot with all tunnels
