@@ -15,7 +15,7 @@ import pandas as pd
 import matplotlib.lines as mlines
 import copy
 
-VERSION_NUMBER = "1.0.0"
+VERSION_NUMBER = "1.1.0"
 # Constants and empirical parameters
 g = 9.81 #Gravitaional acceleration (m/s^2)
 f_h = 0.176 #Empirical factor relating L_n to the length of that part of the fire that influences backlayering propensity (-)
@@ -150,7 +150,7 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web
             oxygen_depletion_msg = f"There is insufficient oxygen for fires greater than {max_fire_hrr *1e-6:.1f} MW"
             critical_velocity, dt = iterate_critical_velocity(fire, tunnel, max_critical_velocity, ambient_temp, ambient_density)   
         else:
-            oxygen_depletion_msg = f"HRR cut off due to oxygen depletion at {max_fire_hrr*1e-6:.1f} MW"
+            oxygen_depletion_msg = f"HRR cut off due to oxygen depletion at {fire_hrrs[np.where(critical_velocities == max_critical_velocity)][0]*1e-6:.1f} MW"
             fire.hrr = max_fire_hrr 
             critical_velocity = max_critical_velocity
 
@@ -168,7 +168,6 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web
         mlines.Line2D([], [], color='none', label=f"{'Hydraulic Diam.:':<16} {tunnel.hydraulic_diameter:>7.2f} m"),
         mlines.Line2D([], [], color='none', label=""),
         mlines.Line2D([], [], color='none', label="Never Gray CV Calculator"),
-        mlines.Line2D([], [], color='none', label=f"{'MIT License, Version'} {VERSION_NUMBER}"),
     ]
     ax.legend(param_lines, [l.get_label() for l in param_lines], loc='lower right', 
               prop={'family': 'monospace', 'size': 9})
@@ -189,34 +188,30 @@ def plot_critical_velocity(tunnel, fire, ambient_temp, ambient_pressure, for_web
 def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min_hrr_input=0.001e6, max_hrr_input=150e6, for_web=True):
     """Function to create a table of critical velocities against HRR. The function checks if there is sufficient oxygen for the range of HRR.
     """
-    # Initial the range
+    # Set the range
     min_hrr = min(min_hrr_input, max_hrr_input, fire.hrr) #HRR close to zero create high temperatures and lead to a specific heat capacity cut off
-    max_hrr = min(3*fire.hrr, max(max_hrr_input, fire.hrr)) #Maximum total fire heat release rate for plot (W)
-    acceptable_resolution = 1000 #Minimum number of plot points for acceptable resolution
-    insufficient_resolution = True #Initial resolution set to True to start calculation
-    while insufficient_resolution:
-        fire_hrrs = np.linspace(min_hrr, max_hrr, 2001)
-        critical_velocities = np.empty_like(fire_hrrs)
-        critical_velocities[-1] = 2.0 #First Guess
-        delta_t = np.empty_like(fire_hrrs)
-        sufficient_oxygen = True
-        fire_copy = copy.deepcopy(fire) #Creates a copy so the originaly value of fire.hrr is retained.
-        for i, fire_hrr in enumerate(fire_hrrs):
-            fire_copy.hrr = fire_hrr
-            if sufficient_oxygen:
-                critical_velocities[i], delta_t[i] = iterate_critical_velocity(fire_copy, tunnel, critical_velocities[i-1], ambient_temp, ambient_density)
-                vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
-            #HRR cut off if minimum oxygen requirement not met
-                if (critical_velocities[i] <= vel_depletion):
-                    print("!!!!HRR cut off due to oxygen depletion!!!!")
-                    sufficient_oxygen = False
-                    # Slice arrays to keep only valid data less than oxygen depletion
-                    fire_hrrs = fire_hrrs[:i+1]
-                    critical_velocities = critical_velocities[:i+1]
-                    delta_t = delta_t[:i+1]
-                    max_hrr = fire_hrrs[i]
-                    break
-        if len(fire_hrrs) > acceptable_resolution: insufficient_resolution = False
+    max_hrr = min(3*fire.hrr, max_hrr_input) #Maximum total fire heat release rate for plot (W)
+    fire_hrrs = np.linspace(min_hrr, max_hrr, 2001)
+    critical_velocities = np.empty_like(fire_hrrs)
+    critical_velocities[-1] = 2.0 #First Guess
+
+    delta_t = np.empty_like(fire_hrrs)
+    sufficient_oxygen = True
+    fire_copy = copy.deepcopy(fire) #Creates a copy so the originaly value of fire.hrr is retained.
+    for i, fire_hrr in enumerate(fire_hrrs):
+        fire_copy.hrr = fire_hrr
+        if sufficient_oxygen:
+            critical_velocities[i], delta_t[i] = iterate_critical_velocity(fire_copy, tunnel, critical_velocities[i-1], ambient_temp, ambient_density)
+            vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
+        #HRR cut off if minimum oxygen requirement not met
+            if (critical_velocities[i] <= vel_depletion):
+                print("!!!!HRR cut off due to oxygen depletion!!!!")
+                sufficient_oxygen = False
+                # Slice arrays to keep only valid data less than oxygen depletion
+                fire_hrrs = fire_hrrs[:i+1]
+                critical_velocities = critical_velocities[:i+1]
+                delta_t = delta_t[:i+1]
+                break
     return fire_hrrs, critical_velocities, sufficient_oxygen
 
 def format_cv_plot_axes(ax, max_hrr_mw, max_cv, title):

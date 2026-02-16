@@ -124,7 +124,7 @@ def index():
                 {
                     'name': 'ambient_pressure',
                     'symbol': r'\( p_a \)',
-                    'description': 'Ambient Pressure',
+                    'description': 'Ambient pressure',
                     'unit': 'Pa',
                     'has_default': True,
                     'default_value': DEFAULTS['ambient_pressure'],
