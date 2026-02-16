@@ -15,7 +15,7 @@ import pandas as pd
 import matplotlib.lines as mlines
 import copy
 
-VERSION_NUMBER = "1.0.0"
+VERSION_NUMBER = "1.1.0"
 # Constants and empirical parameters
 g = 9.81 #Gravitaional acceleration (m/s^2)
 f_h = 0.176 #Empirical factor relating L_n to the length of that part of the fire that influences backlayering propensity (-)
