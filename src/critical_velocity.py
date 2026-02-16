@@ -196,31 +196,6 @@ def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min
     """
     # Set the range
     min_hrr = min(min_hrr_input, max_hrr_input, fire.hrr) #HRR close to zero create high temperatures and lead to a specific heat capacity cut off
-<<<<<<< HEAD
-    max_hrr = min(3*fire.hrr, max_hrr_input) #Maximum total fire heat release rate for plot (W)
-    fire_hrrs = np.linspace(min_hrr, max_hrr, 2001)
-    critical_velocities = np.empty_like(fire_hrrs)
-    critical_velocities[-1] = 2.0 #First Guess
-
-    delta_t = np.empty_like(fire_hrrs)
-    sufficient_oxygen = True
-    fire_copy = copy.deepcopy(fire) #Creates a copy so the originaly value of fire.hrr is retained.
-    for i, fire_hrr in enumerate(fire_hrrs):
-        fire_copy.hrr = fire_hrr
-        if sufficient_oxygen:
-            critical_velocities[i], delta_t[i] = iterate_critical_velocity(fire_copy, tunnel, critical_velocities[i-1], ambient_temp, ambient_density)
-            vel_depletion = oxygen_depletion(fire_hrr, tunnel, ambient_density)
-        #HRR cut off if minimum oxygen requirement not met
-            if (critical_velocities[i] <= vel_depletion):
-                print("!!!!HRR cut off due to oxygen depletion!!!!")
-                sufficient_oxygen = False
-                # Slice arrays to keep only valid data less than oxygen depletion
-                fire_hrrs = fire_hrrs[:i+1]
-                critical_velocities = critical_velocities[:i+1]
-                delta_t = delta_t[:i+1]
-                break
-    return fire_hrrs, critical_velocities, sufficient_oxygen
-=======
     max_hrr = min(3*fire.hrr, max(max_hrr_input, fire.hrr)) #Maximum total fire heat release rate for plot (W)
     acceptable_resolution = 1000 #Minimum number of plot points for acceptable resolution
     insufficient_resolution = True #Initial resolution set to True to start calculation
@@ -251,7 +226,6 @@ def hrrs_vs_critical_velocities(tunnel, fire, ambient_temp, ambient_density, min
                 converging_msg = "WARNING! Critical velocity calculation did not converge. Please check input parameters."
         if len(fire_hrrs) > acceptable_resolution: insufficient_resolution = False
     return fire_hrrs, critical_velocities, sufficient_oxygen, converging_msg
->>>>>>> 52e466b0f31e8b4ed624e8814da82f816045bb15
 
 def format_cv_plot_axes(ax, max_hrr_mw, max_cv, title):
     """Common formatting for critical velocity plots"""
