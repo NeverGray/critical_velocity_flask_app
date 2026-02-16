@@ -40,7 +40,8 @@ def index():
                     'description': 'Characteristic length (height) for natural convection (for pool fires: tunnel height from the base of the fire to highest point at the ceiling)',
                     'unit': 'm',
                     'has_default': False,
-                    'required': True
+                    'required': True,
+                    'greater_than_zero': True
                 },
                 {
                     'name': 'area',
@@ -48,7 +49,8 @@ def index():
                     'description': 'Tunnel cross-sectional area at the fire site',
                     'unit': 'm²',
                     'has_default': False,
-                    'required': True
+                    'required': True,
+                    'greater_than_zero': True
                 },
                 {
                     'name': 'hydraulic_diameter',
@@ -56,7 +58,8 @@ def index():
                     'description': 'Tunnel hydraulic diameter at the fire location',
                     'unit': 'm',
                     'has_default': False,
-                    'required': True
+                    'required': True,
+                    'greater_than_zero': True
                 }
             ]
         },
@@ -69,7 +72,8 @@ def index():
                     'description': 'Total fire heat release rate',
                     'unit': 'MW',
                     'has_default': False,
-                    'required': True
+                    'required': True,
+                    'greater_than_zero': True
                 },
                 {
                     'name': 'intensity',
@@ -119,7 +123,8 @@ def index():
                     'unit': 'K',
                     'has_default': True,
                     'default_value': DEFAULTS['ambient_temp'],
-                    'required': True
+                    'required': True,
+                    'greater_than_zero': True
                 },
                 {
                     'name': 'ambient_pressure',
@@ -178,13 +183,24 @@ def index():
             #Ambient Properties
             ambient_temp = float(processed_values['ambient_temp'])
             ambient_pressure = float(processed_values['ambient_pressure'])
+            
+            # Input Validation: Strictly positive values check
+            if height <= 0 or area <= 0 or hydraulic_diameter <= 0 or ambient_temp <= 0:
+                 flash('Height, Area, Hydraulic Diameter, and Ambient Temperature must be strictly positive.')
+                 return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS, FORM_FIELDS=FORM_FIELDS)
+
             fire = Fire(hrr, intensity, width, epsilon, eta)
             tunnel = Tunnel("Web Tunnel", height, area, hydraulic_diameter)
 
             # Plotting
             plot_url = None
+            critical_velocity = 0
+            fire_hrr = 0
+            oxygen_depletion_msg = ""
+            converging_msg = ""
+
             try:
-                fig, fire_hrr, critical_velocity, oxygen_depletion_msg = plot_critical_velocity(
+                fig, fire_hrr, critical_velocity, oxygen_depletion_msg, converging_msg = plot_critical_velocity(
                     tunnel,
                     fire,
                     ambient_temp=ambient_temp,
@@ -198,6 +214,8 @@ def index():
 
             except Exception as e:
                 plot_url = None
+                flash(f"An error occurred during calculation: {str(e)}")
+                return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS, FORM_FIELDS=FORM_FIELDS)
 
             return render_template(
                 'index.html',
@@ -212,7 +230,7 @@ def index():
 
         except ValueError:
             flash('Please enter valid numerical values for all fields.')
-            return redirect(url_for('index'))
+            return render_template('index.html', form_values=form_values, DEFAULTS=DEFAULTS, FORM_FIELDS=FORM_FIELDS)
 
     # For GET: set defaults dynamically based on field definitions
     form_values = {}
